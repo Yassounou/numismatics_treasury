@@ -18,7 +18,9 @@ public final class ServerShopScreen extends TreasuryScreen {
     private final String configuredItemName;
     private String mode;
     private final int initialPrice;
+    private final int initialLotSize;
     private EditBox valueBox;
+    private EditBox lotSizeBox;
     private TreasuryButton actionButton;
     private InventoryPicker inventoryPicker;
     private int selectedInventorySlot = -1;
@@ -39,6 +41,7 @@ public final class ServerShopScreen extends TreasuryScreen {
         );
         mode = ClientScreenData.string(data, "mode", "SELL_TO_PLAYER");
         initialPrice = ClientScreenData.integer(data, "price", 0);
+        initialLotSize = Math.max(1, ClientScreenData.integer(data, "lotSize", 1));
     }
 
     @Override
@@ -48,16 +51,16 @@ public final class ServerShopScreen extends TreasuryScreen {
     }
 
     private void initCustomer() {
-        layout(350, 190);
+        layout(370, 218);
         int x = panelLeft + 14;
         int contentWidth = panelWidth - 28;
         boolean playerSells = mode.equals("BUY_FROM_PLAYER");
         int quantityWidth = playerSells ? contentWidth - 96 : contentWidth;
         valueBox = numericBox(
                 x,
-                panelTop + 105,
+                panelTop + 107,
                 quantityWidth,
-                Component.translatable("screen.numismatics_treasury.shop.quantity"),
+                Component.translatable("screen.numismatics_treasury.shop.lots"),
                 "1"
         );
         valueBox.setResponder(value -> updateAction());
@@ -69,9 +72,10 @@ public final class ServerShopScreen extends TreasuryScreen {
                                     "screen.numismatics_treasury.shop.sell_all"),
                             ignored -> sellAll())
                     .green()
-                    .confirmation(Component.translatable(
-                            "screen.numismatics_treasury.shop.confirm_sell_all"))
-                    .bounds(x + quantityWidth + 8, panelTop + 105, 88, 20)
+                    .confirmation(Component.translatable(initialLotSize == 1
+                            ? "screen.numismatics_treasury.shop.confirm_sell_all"
+                            : "screen.numismatics_treasury.shop.confirm_sell_all_lots"))
+                    .bounds(x + quantityWidth + 8, panelTop + 107, 88, 20)
                     .build());
         }
 
@@ -79,25 +83,35 @@ public final class ServerShopScreen extends TreasuryScreen {
                         tradeLabel(), ignored -> submit())
                 .green()
                 .confirmation(Component.translatable("screen.numismatics_treasury.confirm"))
-                .bounds(x, panelTop + 140, contentWidth - 78, 20)
+                .bounds(x, panelTop + 174, contentWidth - 78, 20)
                 .build());
         addRenderableWidget(TreasuryButton.builder(
                         Component.translatable("screen.numismatics_treasury.close"),
                         ignored -> onClose())
-                .bounds(x + contentWidth - 70, panelTop + 140, 70, 20)
+                .bounds(x + contentWidth - 70, panelTop + 174, 70, 20)
                 .build());
         updateAction();
     }
 
     private void initAdmin() {
-        layout(370, 278);
+        layout(390, 316);
         int x = panelLeft + 14;
         int contentWidth = panelWidth - 28;
-        valueBox = numericBox(
+        int fieldWidth = (contentWidth - 8) / 2;
+        lotSizeBox = numericBox(
                 x,
                 panelTop + 107,
-                112,
-                Component.translatable("screen.numismatics_treasury.shop.unit_price"),
+                fieldWidth,
+                Component.translatable("screen.numismatics_treasury.shop.items_per_lot"),
+                Integer.toString(initialLotSize)
+        );
+        lotSizeBox.setResponder(value -> updateAction());
+        addRenderableWidget(lotSizeBox);
+        valueBox = numericBox(
+                x + fieldWidth + 8,
+                panelTop + 107,
+                fieldWidth,
+                Component.translatable("screen.numismatics_treasury.shop.lot_price"),
                 Integer.toString(initialPrice)
         );
         valueBox.setResponder(value -> updateAction());
@@ -110,14 +124,14 @@ public final class ServerShopScreen extends TreasuryScreen {
                                     ? "BUY_FROM_PLAYER" : "SELL_TO_PLAYER";
                             button.setMessage(modeLabel());
                         })
-                .bounds(x + 120, panelTop + 107, 108, 20)
+                .bounds(x, panelTop + 138, fieldWidth, 20)
                 .build());
         actionButton = addRenderableWidget(TreasuryButton.builder(
                         Component.translatable("screen.numismatics_treasury.save"),
                         ignored -> submit())
                 .green()
                 .confirmation(Component.translatable("screen.numismatics_treasury.confirm"))
-                .bounds(x + 236, panelTop + 107, contentWidth - 236, 20)
+                .bounds(x + fieldWidth + 8, panelTop + 138, fieldWidth, 20)
                 .build());
         addRenderableWidget(TreasuryButton.builder(
                         Component.literal("×"), ignored -> onClose())
@@ -126,7 +140,7 @@ public final class ServerShopScreen extends TreasuryScreen {
 
         inventoryPicker = new InventoryPicker(
                 x,
-                panelTop + 174,
+                panelTop + 216,
                 selectedInventorySlot
         );
         updateAction();
@@ -152,10 +166,38 @@ public final class ServerShopScreen extends TreasuryScreen {
                 : "screen.numismatics_treasury.shop.sell");
     }
 
+    private Component offerLabel() {
+        boolean serverSells = mode.equals("SELL_TO_PLAYER");
+        if (initialLotSize == 1) {
+            return Component.translatable(
+                    serverSells
+                            ? "screen.numismatics_treasury.shop.server_sells"
+                            : "screen.numismatics_treasury.shop.server_buys",
+                    MoneyDisplay.exact(initialPrice)
+            );
+        }
+        return Component.translatable(
+                serverSells
+                        ? "screen.numismatics_treasury.shop.server_sells_lot"
+                        : "screen.numismatics_treasury.shop.server_buys_lot",
+                MoneyDisplay.exact(initialLotSize),
+                MoneyDisplay.exact(initialPrice)
+        );
+    }
+
     private int value() {
         try {
             return valueBox == null || valueBox.getValue().isBlank()
                     ? 0 : Integer.parseInt(valueBox.getValue());
+        } catch (NumberFormatException exception) {
+            return 0;
+        }
+    }
+
+    private int lotSize() {
+        try {
+            return lotSizeBox == null || lotSizeBox.getValue().isBlank()
+                    ? 0 : Integer.parseInt(lotSizeBox.getValue());
         } catch (NumberFormatException exception) {
             return 0;
         }
@@ -185,7 +227,8 @@ public final class ServerShopScreen extends TreasuryScreen {
         if (actionButton == null) return;
         int value = value();
         actionButton.active = !previewStack().isEmpty() && value > 0
-                && (admin || value <= 2_304);
+                && (admin ? lotSize() > 0 && lotSize() <= 2_304
+                : value <= Math.max(1, 2_304 / initialLotSize));
         if (!admin && value > 0) {
             long total = (long) initialPrice * value;
             actionButton.resetConfirmation(Component.translatable(
@@ -208,11 +251,12 @@ public final class ServerShopScreen extends TreasuryScreen {
         if (admin) {
             data.addProperty("mode", mode);
             data.addProperty("price", value());
+            data.addProperty("lotSize", lotSize());
             data.addProperty("inventorySlot", inventoryPicker == null
                     ? -1 : inventoryPicker.selectedSlot());
             TreasuryNetwork.sendAction("shop_config", data);
         } else {
-            data.addProperty("quantity", value());
+            data.addProperty("lots", value());
             TreasuryNetwork.sendAction("shop_trade", data);
         }
     }
@@ -267,10 +311,23 @@ public final class ServerShopScreen extends TreasuryScreen {
         renderItemCard(graphics, panelTop + 40, false);
         graphics.drawString(
                 font,
-                Component.translatable("screen.numismatics_treasury.shop.quantity"),
+                Component.translatable("screen.numismatics_treasury.shop.lots"),
                 panelLeft + 14,
-                panelTop + 94,
+                panelTop + 95,
                 TEXT,
+                false
+        );
+        int lots = value();
+        graphics.drawString(
+                font,
+                Component.translatable(
+                        "screen.numismatics_treasury.shop.trade_summary",
+                        MoneyDisplay.exact((long) initialLotSize * lots),
+                        MoneyDisplay.exact((long) initialPrice * lots)
+                ),
+                panelLeft + 14,
+                panelTop + 138,
+                lots > 0 ? ACCENT : MUTED,
                 false
         );
     }
@@ -279,8 +336,16 @@ public final class ServerShopScreen extends TreasuryScreen {
         renderItemCard(graphics, panelTop + 40, true);
         graphics.drawString(
                 font,
-                Component.translatable("screen.numismatics_treasury.shop.unit_price"),
+                Component.translatable("screen.numismatics_treasury.shop.items_per_lot"),
                 panelLeft + 14,
+                panelTop + 95,
+                TEXT,
+                false
+        );
+        graphics.drawString(
+                font,
+                Component.translatable("screen.numismatics_treasury.shop.lot_price"),
+                panelLeft + 14 + (panelWidth - 36) / 2 + 8,
                 panelTop + 95,
                 TEXT,
                 false
@@ -289,7 +354,7 @@ public final class ServerShopScreen extends TreasuryScreen {
                 font,
                 Component.translatable("screen.numismatics_treasury.inventory"),
                 panelLeft + 14,
-                panelTop + 160,
+                panelTop + 202,
                 TEXT,
                 false
         );
@@ -300,7 +365,7 @@ public final class ServerShopScreen extends TreasuryScreen {
                 font,
                 Component.translatable("screen.numismatics_treasury.shop.pick_help"),
                 panelLeft + 184,
-                panelTop + 178,
+                panelTop + 220,
                 panelWidth - 198,
                 MUTED
         );
@@ -313,19 +378,21 @@ public final class ServerShopScreen extends TreasuryScreen {
         graphics.fill(cardX, cardY, cardX + cardWidth, cardY + 48, PANEL_ALT);
         outline(graphics, cardX, cardY, cardWidth, 48, shown.isEmpty() ? ERROR : SEPARATOR);
         if (!shown.isEmpty()) graphics.renderItem(shown, cardX + 10, cardY + 10);
-        graphics.drawString(font, previewName(), cardX + 34, cardY + 10, TEXT, false);
+        graphics.drawString(
+                font,
+                font.plainSubstrByWidth(previewName().getString(), cardWidth - 44),
+                cardX + 34,
+                cardY + 10,
+                TEXT,
+                false
+        );
         Component subtitle = editable
                 ? Component.translatable(
                         "screen.numismatics_treasury.shop.selected_item_help")
-                : Component.translatable(
-                        mode.equals("SELL_TO_PLAYER")
-                                ? "screen.numismatics_treasury.shop.server_sells"
-                                : "screen.numismatics_treasury.shop.server_buys",
-                        initialPrice
-                );
+                : offerLabel();
         graphics.drawString(
                 font,
-                subtitle,
+                font.plainSubstrByWidth(subtitle.getString(), cardWidth - 44),
                 cardX + 34,
                 cardY + 27,
                 editable ? MUTED : ACCENT,

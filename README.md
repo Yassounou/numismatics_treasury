@@ -1,4 +1,4 @@
-# Numismatics Treasury 1.0.0
+# Numismatics Treasury 1.0.1
 
 Addon NeoForge 1.21.1 pour Numismatics, développé sous le namespace
 `numismatics_treasury` et le package `dev.yassou.numismaticstreasury`.
@@ -10,12 +10,14 @@ Addon NeoForge 1.21.1 pour Numismatics, développé sous le namespace
 - Guichet de virement : même transfert dans une interface dédiée.
 - Terminal de transfert portable : ouvre cette interface directement depuis
   la main, sans bloc à proximité.
-- Shop serveur : vente ou rachat d'un objet, stock et argent serveur infinis,
-  paiement exclusivement depuis le compte bancaire du joueur.
+- Shop serveur : vente ou rachat d'un objet par unité ou par lot, stock et
+  argent serveur infinis, paiement exclusivement depuis le compte bancaire du
+  joueur.
 - Shop joueur : un seul type d'objet, stock à capacité illimitée et versement
-  direct des ventes sur le compte Numismatics du propriétaire. Les entonnoirs
-  vanilla et les systèmes d'insertion de Create peuvent l'alimenter, mais
-  uniquement avec l'objet configuré.
+  direct des ventes sur le compte Numismatics du propriétaire. Le propriétaire
+  configure le nombre d'objets et le prix de chaque lot. Les entonnoirs vanilla
+  et les systèmes d'insertion de Create peuvent l'alimenter, mais uniquement
+  avec l'objet configuré.
 - Hôtel des ventes global : ventes directes, enchères avec argent bloqué,
   expirations, commission configurable et récupération sécurisée des objets.
 - Interfaces sombres sans flou vanilla, boutons et cadres adaptés dans le
@@ -25,9 +27,10 @@ Addon NeoForge 1.21.1 pour Numismatics, développé sous le namespace
 
 - Clic droit sur le shop : ouvrir le commerce.
 - Maj + clic droit par un opérateur sur le shop : choisir l'objet tenu en main,
-  le sens achat/vente et le prix unitaire.
-- Maj + clic droit sur son shop joueur : choisir l'objet et le prix puis
-  transférer les piles vers le véritable slot d'entrée avec Maj + clic. Seul
+  le sens achat/vente, le nombre d'objets par lot et le prix du lot.
+- Maj + clic droit sur son shop joueur : choisir l'objet, la taille et le prix
+  du lot, puis transférer les piles vers le véritable slot d'entrée avec la
+  combinaison Maj + clic. Seul
   son propriétaire (ou un opérateur) peut le modifier et il faut vider tout
   son stock avant de le casser.
 - Clic droit sur n'importe quel hôtel des ventes : ouvrir le marché global.
@@ -75,7 +78,7 @@ Numismatics est la seule dépendance de mod déclarée par cet addon.
 
 ## Installation
 
-Placez `numismatics_treasury-1.0.0.jar` dans le dossier `mods` du serveur et
+Placez `numismatics_treasury-1.0.1.jar` dans le dossier `mods` du serveur et
 des clients, aux côtés de Numismatics. Le fichier JSON de configuration est
 exclusivement géré par le serveur puis synchronisé vers les clients : il ne
 doit donc être modifié qu'une seule fois, côté serveur.

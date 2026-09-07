@@ -120,10 +120,16 @@ public final class ShopHoverOverlay {
                         ? "overlay.numismatics_treasury.shop.buy"
                         : "overlay.numismatics_treasury.shop.sell"
         );
-        Component price = Component.translatable(
-                "overlay.numismatics_treasury.shop.price",
-                MoneyDisplay.exact(shop.price())
-        );
+        Component price = shop.lotSize() == 1
+                ? Component.translatable(
+                        "overlay.numismatics_treasury.shop.price",
+                        MoneyDisplay.exact(shop.price())
+                )
+                : Component.translatable(
+                        "overlay.numismatics_treasury.shop.lot_price",
+                        MoneyDisplay.exact(shop.lotSize()),
+                        MoneyDisplay.exact(shop.price())
+                );
         String itemName = font.plainSubstrByWidth(shop.template().getHoverName().getString(), 180);
 
         int textXOffset = 22;

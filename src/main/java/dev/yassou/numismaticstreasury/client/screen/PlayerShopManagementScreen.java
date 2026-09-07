@@ -23,6 +23,7 @@ public final class PlayerShopManagementScreen
     private static final int ACCENT = 0xFFE0B04B;
 
     private EditBox priceBox;
+    private EditBox lotSizeBox;
     private TreasuryButton saveButton;
     private TreasuryButton withdrawButton;
 
@@ -43,13 +44,28 @@ public final class PlayerShopManagementScreen
     @Override
     protected void init() {
         super.init();
-        priceBox = new EditBox(
+        lotSizeBox = new EditBox(
                 font,
                 leftPos + 8,
                 topPos + 76,
-                160,
+                78,
                 20,
-                Component.translatable("screen.numismatics_treasury.shop.unit_price")
+                Component.translatable("screen.numismatics_treasury.shop.items_per_lot")
+        );
+        lotSizeBox.setMaxLength(4);
+        lotSizeBox.setFilter(value -> value.isEmpty()
+                || value.chars().allMatch(Character::isDigit));
+        lotSizeBox.setValue(Integer.toString(menu.lotSize()));
+        lotSizeBox.setResponder(ignored -> updateButtons());
+        addRenderableWidget(lotSizeBox);
+
+        priceBox = new EditBox(
+                font,
+                leftPos + 90,
+                topPos + 76,
+                78,
+                20,
+                Component.translatable("screen.numismatics_treasury.shop.lot_price")
         );
         priceBox.setMaxLength(10);
         priceBox.setFilter(value -> value.isEmpty()
@@ -89,9 +105,18 @@ public final class PlayerShopManagementScreen
         }
     }
 
+    private int lotSize() {
+        try {
+            return lotSizeBox == null || lotSizeBox.getValue().isBlank()
+                    ? 0 : Integer.parseInt(lotSizeBox.getValue());
+        } catch (NumberFormatException exception) {
+            return 0;
+        }
+    }
+
     private void updateButtons() {
         if (saveButton != null) {
-            saveButton.active = price() > 0
+            saveButton.active = price() > 0 && lotSize() > 0 && lotSize() <= 2_304
                     && (!menu.inputStack().isEmpty() || !menu.shopItem().isEmpty());
         }
         if (withdrawButton != null) {
@@ -103,6 +128,7 @@ public final class PlayerShopManagementScreen
         JsonObject data = new JsonObject();
         data.addProperty("pos", menu.blockPos().asLong());
         data.addProperty("price", price());
+        data.addProperty("lotSize", lotSize());
         TreasuryNetwork.sendAction("player_shop_menu_config", data);
     }
 
@@ -203,11 +229,26 @@ public final class PlayerShopManagementScreen
         Component name = shown.isEmpty()
                 ? Component.translatable("screen.numismatics_treasury.no_item")
                 : shown.getHoverName();
-        graphics.drawString(font, name, 31, 49, shown.isEmpty() ? MUTED : TEXT, false);
         graphics.drawString(
                 font,
-                Component.translatable("screen.numismatics_treasury.shop.unit_price"),
+                font.plainSubstrByWidth(name.getString(), imageWidth - 39),
+                31,
+                49,
+                shown.isEmpty() ? MUTED : TEXT,
+                false
+        );
+        graphics.drawString(
+                font,
+                Component.translatable("screen.numismatics_treasury.shop.items_per_lot_short"),
                 8,
+                65,
+                TEXT,
+                false
+        );
+        graphics.drawString(
+                font,
+                Component.translatable("screen.numismatics_treasury.shop.lot_price_short"),
+                90,
                 65,
                 TEXT,
                 false

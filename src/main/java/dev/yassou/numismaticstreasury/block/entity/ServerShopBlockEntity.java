@@ -26,9 +26,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 
 public final class ServerShopBlockEntity extends BlockEntity implements MenuProvider {
+    private static final int MAX_LOT_SIZE = 2_304;
+
     private ShopMode mode = ShopMode.SELL_TO_PLAYER;
     private ItemStack template = ItemStack.EMPTY;
     private int price;
+    private int lotSize = 1;
     private UUID ownerUuid;
     private String ownerName = "";
     private long stock;
@@ -86,6 +89,7 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     public ShopMode mode() { return mode; }
     public ItemStack template() { return template.copy(); }
     public int price() { return price; }
+    public int lotSize() { return lotSize; }
     @Nullable public UUID ownerUuid() { return ownerUuid; }
     public String ownerName() { return ownerName; }
     public long stock() { return stock; }
@@ -141,19 +145,22 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
         ItemStack.OPTIONAL_STREAM_CODEC.encode(buffer, template);
         buffer.writeVarInt(price);
         buffer.writeVarLong(stock);
+        buffer.writeVarInt(lotSize);
     }
 
-    public void configure(ShopMode mode, ItemStack template, int price) {
+    public void configure(ShopMode mode, ItemStack template, int price, int lotSize) {
         this.mode = mode;
         this.template = template.isEmpty() ? ItemStack.EMPTY : template.copyWithCount(1);
         this.price = Math.max(0, price);
+        this.lotSize = Math.min(MAX_LOT_SIZE, Math.max(1, lotSize));
         sync();
     }
 
-    public void configurePlayer(ItemStack template, int price) {
+    public void configurePlayer(ItemStack template, int price, int lotSize) {
         this.mode = ShopMode.SELL_TO_PLAYER;
         this.template = template.isEmpty() ? ItemStack.EMPTY : template.copyWithCount(1);
         this.price = Math.max(0, price);
+        this.lotSize = Math.min(MAX_LOT_SIZE, Math.max(1, lotSize));
         sync();
     }
 
@@ -193,6 +200,9 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
         mode = ShopMode.parse(tag.getString("mode"));
         template = ItemStack.parseOptional(registries, tag.getCompound("item"));
         price = Math.max(0, tag.getInt("price"));
+        lotSize = tag.contains("lotSize")
+                ? Math.min(MAX_LOT_SIZE, Math.max(1, tag.getInt("lotSize")))
+                : 1;
         ownerUuid = tag.hasUUID("ownerUuid") ? tag.getUUID("ownerUuid") : null;
         ownerName = tag.getString("ownerName");
         stock = Math.max(0L, tag.getLong("stock"));
@@ -204,6 +214,7 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
         tag.putString("mode", mode.name());
         tag.put("item", template.saveOptional(registries));
         tag.putInt("price", price);
+        tag.putInt("lotSize", lotSize);
         if (ownerUuid != null) tag.putUUID("ownerUuid", ownerUuid);
         tag.putString("ownerName", ownerName);
         tag.putLong("stock", stock);

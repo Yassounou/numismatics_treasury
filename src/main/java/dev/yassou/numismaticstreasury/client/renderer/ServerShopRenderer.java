@@ -111,10 +111,16 @@ public final class ServerShopRenderer implements BlockEntityRenderer<ServerShopB
             PoseStack poseStack,
             MultiBufferSource buffers
     ) {
-        Component price = Component.translatable(
-                "display.numismatics_treasury.shop.price",
-                MoneyDisplay.exact(shop.price())
-        );
+        Component price = shop.lotSize() == 1
+                ? Component.translatable(
+                        "display.numismatics_treasury.shop.price",
+                        MoneyDisplay.exact(shop.price())
+                )
+                : Component.translatable(
+                        "display.numismatics_treasury.shop.lot_price",
+                        MoneyDisplay.exact(shop.lotSize()),
+                        MoneyDisplay.exact(shop.price())
+                );
         int textWidth = Math.max(1, font.width(price));
         float scale = Math.min(MAX_PRICE_SCALE, PRICE_WIDTH / textWidth);
 

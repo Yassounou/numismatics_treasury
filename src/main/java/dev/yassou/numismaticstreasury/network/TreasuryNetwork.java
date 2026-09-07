@@ -21,7 +21,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class TreasuryNetwork {
     public static final Gson GSON = new Gson();
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "2";
 
     private TreasuryNetwork() {
     }
@@ -105,6 +105,7 @@ public final class TreasuryNetwork {
         data.addProperty("pos", shop.getBlockPos().asLong());
         data.addProperty("mode", shop.mode().name());
         data.addProperty("price", shop.price());
+        data.addProperty("lotSize", shop.lotSize());
         data.addProperty("balance", BankService.balance(player));
         addItem(data, shop.template());
         return data;

@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class ServerActionHandler {
+    private static final int MAX_TRANSACTION_ITEMS = 2_304;
+
     private ServerActionHandler() {
     }
 
@@ -149,6 +151,11 @@ public final class ServerActionHandler {
             message(player, false, "message.numismatics_treasury.price_invalid");
             return;
         }
+        int lotSize = configuredLotSize(data, shop);
+        if (!validLotSize(lotSize)) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+            return;
+        }
         int inventorySlot = data.has("inventorySlot")
                 ? data.get("inventorySlot").getAsInt() : -1;
         ItemStack template = inventorySlot >= 0
@@ -159,7 +166,12 @@ public final class ServerActionHandler {
             message(player, false, "message.numismatics_treasury.shop.item_required");
             return;
         }
-        shop.configure(ShopMode.parse(data.get("mode").getAsString()), template, price);
+        shop.configure(
+                ShopMode.parse(data.get("mode").getAsString()),
+                template,
+                price,
+                lotSize
+        );
         message(player, true, "message.numismatics_treasury.shop.configured");
         TreasuryNetwork.openShopAdmin(player, shop);
     }
@@ -185,10 +197,18 @@ public final class ServerActionHandler {
             message(player, false, "message.numismatics_treasury.request_invalid");
             return;
         }
-        int quantity = sellAll
-                ? InventoryUtil.countMatching(player, shop.template())
-                : data.get("quantity").getAsInt();
-        if (quantity <= 0 || !sellAll && quantity > 2_304) {
+        int lots = sellAll
+                ? InventoryUtil.countMatching(player, shop.template()) / shop.lotSize()
+                : requestedLots(data);
+        int quantity;
+        try {
+            quantity = Math.multiplyExact(shop.lotSize(), lots);
+        } catch (ArithmeticException exception) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+            TreasuryNetwork.openShop(player, shop);
+            return;
+        }
+        if (lots <= 0 || quantity <= 0 || quantity > MAX_TRANSACTION_ITEMS) {
             message(player, false, sellAll
                     ? "message.numismatics_treasury.shop.not_enough_items"
                     : "message.numismatics_treasury.quantity_invalid");
@@ -197,7 +217,7 @@ public final class ServerActionHandler {
         }
         int total;
         try {
-            total = Math.multiplyExact(shop.price(), quantity);
+            total = Math.multiplyExact(shop.price(), lots);
         } catch (ArithmeticException exception) {
             message(player, false, "message.numismatics_treasury.amount_too_large");
             return;
@@ -236,6 +256,12 @@ public final class ServerActionHandler {
             TreasuryNetwork.openPlayerShopAdmin(player, shop);
             return;
         }
+        int lotSize = configuredLotSize(data, shop);
+        if (!validLotSize(lotSize)) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+            TreasuryNetwork.openPlayerShopAdmin(player, shop);
+            return;
+        }
         int inventorySlot = data.has("inventorySlot")
                 ? data.get("inventorySlot").getAsInt() : -1;
         ItemStack template = inventorySlot >= 0
@@ -253,7 +279,7 @@ public final class ServerActionHandler {
             TreasuryNetwork.openPlayerShopAdmin(player, shop);
             return;
         }
-        shop.configurePlayer(template, price);
+        shop.configurePlayer(template, price, lotSize);
         message(player, true, "message.numismatics_treasury.player_shop.configured");
         TreasuryNetwork.openPlayerShopAdmin(player, shop);
     }
@@ -271,6 +297,11 @@ public final class ServerActionHandler {
             message(player, false, "message.numismatics_treasury.price_invalid");
             return;
         }
+        int lotSize = configuredLotSize(data, shop);
+        if (!validLotSize(lotSize)) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+            return;
+        }
         ItemStack pending = menu.inputStack();
         ItemStack template = pending.isEmpty() ? shop.template() : pending;
         if (template.isEmpty()) {
@@ -282,7 +313,7 @@ public final class ServerActionHandler {
             message(player, false, "message.numismatics_treasury.player_shop.empty_before_change");
             return;
         }
-        shop.configurePlayer(template, price);
+        shop.configurePlayer(template, price, lotSize);
         int deposited = menu.depositPendingInput();
         if (deposited < 0) {
             message(player, false, "message.numismatics_treasury.player_shop.stock_too_large");
@@ -366,8 +397,16 @@ public final class ServerActionHandler {
     private static void tradePlayerShop(ServerPlayer player, JsonObject data) {
         ServerShopBlockEntity shop = playerShop(player, data, false);
         if (shop == null) return;
-        int quantity = data.get("quantity").getAsInt();
-        if (quantity <= 0 || quantity > 2_304) {
+        int lots = requestedLots(data);
+        int quantity;
+        try {
+            quantity = Math.multiplyExact(shop.lotSize(), lots);
+        } catch (ArithmeticException exception) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+            TreasuryNetwork.openPlayerShop(player, shop);
+            return;
+        }
+        if (lots <= 0 || quantity <= 0 || quantity > MAX_TRANSACTION_ITEMS) {
             message(player, false, "message.numismatics_treasury.quantity_invalid");
             TreasuryNetwork.openPlayerShop(player, shop);
             return;
@@ -389,7 +428,7 @@ public final class ServerActionHandler {
         }
         int total;
         try {
-            total = Math.multiplyExact(shop.price(), quantity);
+            total = Math.multiplyExact(shop.price(), lots);
         } catch (ArithmeticException exception) {
             message(player, false, "message.numismatics_treasury.amount_too_large");
             return;
@@ -410,6 +449,21 @@ public final class ServerActionHandler {
             notifyPlayerShopOwner(player, shop, template, quantity, total);
         }
         TreasuryNetwork.openPlayerShop(player, shop);
+    }
+
+    private static int configuredLotSize(
+            JsonObject data,
+            ServerShopBlockEntity shop
+    ) {
+        return data.has("lotSize") ? data.get("lotSize").getAsInt() : shop.lotSize();
+    }
+
+    private static int requestedLots(JsonObject data) {
+        return data.has("lots") ? data.get("lots").getAsInt() : 0;
+    }
+
+    private static boolean validLotSize(int lotSize) {
+        return lotSize > 0 && lotSize <= MAX_TRANSACTION_ITEMS;
     }
 
     private static ServerShopBlockEntity playerShop(
@@ -562,7 +616,7 @@ public final class ServerActionHandler {
     }
 
     private static boolean near(ServerPlayer player, BlockPos pos) {
-        return player.blockPosition().distSqr(pos) <= 64.0D;
+        return player.canInteractWithBlock(pos, 4.0D);
     }
 
     private static void message(

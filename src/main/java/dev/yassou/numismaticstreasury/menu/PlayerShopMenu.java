@@ -39,12 +39,13 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                 containerId,
                 playerInventory,
                 null,
-                new SimpleContainerData(3),
+                new SimpleContainerData(4),
                 buffer.readBlockPos(),
                 buffer.readUtf(64),
                 ItemStack.OPTIONAL_STREAM_CODEC.decode(buffer),
                 buffer.readVarInt(),
-                buffer.readVarLong()
+                buffer.readVarLong(),
+                buffer.readVarInt()
         );
     }
 
@@ -62,7 +63,8 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                 shop.ownerName(),
                 shop.template(),
                 shop.price(),
-                shop.stock()
+                shop.stock(),
+                shop.lotSize()
         );
     }
 
@@ -75,7 +77,8 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
             String ownerName,
             ItemStack initialShopItem,
             int initialPrice,
-            long initialStock
+            long initialStock,
+            int initialLotSize
     ) {
         super(TreasuryMenus.PLAYER_SHOP.get(), containerId);
         this.shop = shop;
@@ -87,6 +90,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
             data.set(0, initialPrice);
             data.set(1, (int) initialStock);
             data.set(2, (int) (initialStock >>> 32));
+            data.set(3, initialLotSize);
         }
 
         addSlot(new Slot(input, 0, 9, 38) {
@@ -125,6 +129,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                     case 0 -> shop.price();
                     case 1 -> (int) shop.stock();
                     case 2 -> (int) (shop.stock() >>> 32);
+                    case 3 -> shop.lotSize();
                     default -> 0;
                 };
             }
@@ -135,7 +140,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
 
             @Override
             public int getCount() {
-                return 3;
+                return 4;
             }
         };
     }
@@ -154,6 +159,10 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
 
     public long stock() {
         return Integer.toUnsignedLong(data.get(1)) | (long) data.get(2) << 32;
+    }
+
+    public int lotSize() {
+        return Math.max(1, data.get(3));
     }
 
     public ItemStack shopItem() {
