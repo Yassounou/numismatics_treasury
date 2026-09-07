@@ -1,0 +1,15 @@
+{
+  "neoforge:conditions": [
+    { "type": "numismatics_treasury:module_enabled", "module": "auction_house" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [" K ", "BCB", "PPP"],
+  "key": {
+    "K": { "item": "minecraft:book" },
+    "B": { "tag": "c:ingots/brass" },
+    "C": { "item": "numismatics:spur" },
+    "P": { "tag": "minecraft:planks" }
+  },
+  "result": { "id": "numismatics_treasury:auction_house", "count": 1 }
+}

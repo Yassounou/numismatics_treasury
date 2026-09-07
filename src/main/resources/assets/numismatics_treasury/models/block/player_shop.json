@@ -1,0 +1,7 @@
+{
+  "parent": "numismatics_treasury:block/admin_shop",
+  "textures": {
+    "1": "numismatics_treasury:block/player_shop",
+    "particle": "numismatics_treasury:block/player_shop"
+  }
+}

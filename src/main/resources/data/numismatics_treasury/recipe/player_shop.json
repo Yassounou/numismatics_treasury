@@ -1,0 +1,15 @@
+{
+  "neoforge:conditions": [
+    { "type": "numismatics_treasury:module_enabled", "module": "player_shop" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["GBG", "BCB", "BRB"],
+  "key": {
+    "G": { "item": "minecraft:glass" },
+    "B": { "tag": "c:ingots/brass" },
+    "C": { "item": "minecraft:chest" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": { "id": "numismatics_treasury:player_shop", "count": 1 }
+}

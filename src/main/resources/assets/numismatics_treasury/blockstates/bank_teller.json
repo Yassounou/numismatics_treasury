@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "numismatics_treasury:block/bank_teller" },
+    "facing=east": { "model": "numismatics_treasury:block/bank_teller", "y": 90 },
+    "facing=south": { "model": "numismatics_treasury:block/bank_teller", "y": 180 },
+    "facing=west": { "model": "numismatics_treasury:block/bank_teller", "y": 270 }
+  }
+}

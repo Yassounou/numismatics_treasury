@@ -1,0 +1,13 @@
+.gradle/
+build/
+build-release/
+run/
+out/
+*.log
+*.class
+/.idea/
+/.vscode/
+/.analysis-upstream/
+/assets/
+/p assets/
+/CreateNumismatics-*.jar

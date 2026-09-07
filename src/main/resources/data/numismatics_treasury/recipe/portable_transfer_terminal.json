@@ -1,0 +1,21 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "numismatics_treasury:module_enabled",
+      "module": "portable_transfer_terminal"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["SES", "SPS", "STS"],
+  "key": {
+    "S": { "item": "create:brass_sheet" },
+    "E": { "item": "create:electron_tube" },
+    "P": { "item": "create:precision_mechanism" },
+    "T": { "item": "numismatics:bank_terminal" }
+  },
+  "result": {
+    "id": "numismatics_treasury:portable_transfer_terminal",
+    "count": 1
+  }
+}

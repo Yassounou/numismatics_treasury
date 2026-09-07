@@ -1,0 +1,14 @@
+{
+  "neoforge:conditions": [
+    { "type": "numismatics_treasury:module_enabled", "module": "bank_teller" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["BRB", "BCB", "BBB"],
+  "key": {
+    "B": { "tag": "c:ingots/brass" },
+    "R": { "item": "minecraft:redstone" },
+    "C": { "item": "numismatics:spur" }
+  },
+  "result": { "id": "numismatics_treasury:bank_teller", "count": 1 }
+}

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "numismatics_treasury:block/player_shop" },
+    "facing=east": { "model": "numismatics_treasury:block/player_shop", "y": 90 },
+    "facing=south": { "model": "numismatics_treasury:block/player_shop", "y": 180 },
+    "facing=west": { "model": "numismatics_treasury:block/player_shop", "y": 270 }
+  }
+}
