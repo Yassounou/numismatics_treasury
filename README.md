@@ -1,4 +1,4 @@
-# Numismatics Treasury 1.0.1
+# Numismatics Treasury 1.0.2
 
 Addon NeoForge 1.21.1 pour Numismatics, développé sous le namespace
 `numismatics_treasury` et le package `dev.yassou.numismaticstreasury`.
@@ -78,7 +78,7 @@ Numismatics est la seule dépendance de mod déclarée par cet addon.
 
 ## Installation
 
-Placez `numismatics_treasury-1.0.1.jar` dans le dossier `mods` du serveur et
+Placez `numismatics_treasury-1.0.2.jar` dans le dossier `mods` du serveur et
 des clients, aux côtés de Numismatics. Le fichier JSON de configuration est
 exclusivement géré par le serveur puis synchronisé vers les clients : il ne
 doit donc être modifié qu'une seule fois, côté serveur.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2 — 2026-09-07
+
+- Le shop serveur est désormais incassable et ne produit aucun objet lorsqu'il
+  est supprimé par une commande ou un outil administratif.
+- Les shops joueur et l'hôtel des ventes restent cassables à la main, avec une
+  vitesse adaptée à la hache.
+- Le guichet de virement est cassable à la main, plus rapide à miner avec une
+  pioche et produit correctement son propre bloc.
+
 ## 1.0.1 — 2026-09-07
 
 - Ajout des ventes par lots configurables dans les shops serveur et joueur.

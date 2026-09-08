@@ -12,7 +12,6 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
@@ -35,9 +34,10 @@ public final class TreasuryContent {
             ServerShopBlock::new,
             BlockBehaviour.Properties.of()
                     .mapColor(MapColor.METAL)
-                    .strength(3.5F, 8.0F)
+                    .strength(-1.0F, 3_600_000.0F)
                     .sound(SoundType.METAL)
                     .noOcclusion()
+                    .noLootTable()
     );
     public static final DeferredBlock<PlayerShopBlock> PLAYER_SHOP = BLOCKS.registerBlock(
             "player_shop",
@@ -60,8 +60,10 @@ public final class TreasuryContent {
     public static final DeferredBlock<BankTellerBlock> BANK_TELLER = BLOCKS.registerBlock(
             "bank_teller",
             BankTellerBlock::new,
-            BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
                     .strength(4.0F, 8.0F)
+                    .sound(SoundType.METAL)
                     .noOcclusion()
     );
 

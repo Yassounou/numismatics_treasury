@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "numismatics_treasury:player_shop",
+    "numismatics_treasury:auction_house"
+  ]
+}
