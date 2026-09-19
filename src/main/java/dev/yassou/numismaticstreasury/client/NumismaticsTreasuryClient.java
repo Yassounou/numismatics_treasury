@@ -8,6 +8,7 @@ import dev.yassou.numismaticstreasury.client.screen.BankTellerScreen;
 import dev.yassou.numismaticstreasury.client.screen.ServerShopScreen;
 import dev.yassou.numismaticstreasury.client.screen.PlayerShopScreen;
 import dev.yassou.numismaticstreasury.client.screen.PlayerShopManagementScreen;
+import dev.yassou.numismaticstreasury.client.screen.PlayerShopAssociatesScreen;
 import dev.yassou.numismaticstreasury.network.ClientPayloadBridge;
 import dev.yassou.numismaticstreasury.registry.TreasuryBlockEntities;
 import dev.yassou.numismaticstreasury.registry.TreasuryMenus;
@@ -29,6 +30,8 @@ public final class NumismaticsTreasuryClient {
                 case "shop" -> minecraft.setScreen(new ServerShopScreen(payload.json(), false));
                 case "shop_admin" -> minecraft.setScreen(new ServerShopScreen(payload.json(), true));
                 case "player_shop" -> minecraft.setScreen(new PlayerShopScreen(payload.json(), false));
+                case "player_shop_associates" -> minecraft.setScreen(
+                        new PlayerShopAssociatesScreen(payload.json()));
                 case "auction" -> {
                     if (minecraft.screen instanceof AuctionHouseScreen screen) {
                         screen.refresh(payload.json());

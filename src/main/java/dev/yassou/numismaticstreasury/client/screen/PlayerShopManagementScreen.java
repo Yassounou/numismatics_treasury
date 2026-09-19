@@ -26,6 +26,7 @@ public final class PlayerShopManagementScreen
     private EditBox lotSizeBox;
     private TreasuryButton saveButton;
     private TreasuryButton withdrawButton;
+    private TreasuryButton associatesButton;
 
     public PlayerShopManagementScreen(
             PlayerShopMenu menu,
@@ -34,11 +35,11 @@ public final class PlayerShopManagementScreen
     ) {
         super(menu, inventory, title);
         imageWidth = 176;
-        imageHeight = 228;
+        imageHeight = 255;
         titleLabelX = 10;
         titleLabelY = 10;
         inventoryLabelX = 8;
-        inventoryLabelY = 136;
+        inventoryLabelY = 163;
     }
 
     @Override
@@ -87,6 +88,13 @@ public final class PlayerShopManagementScreen
                         ignored -> withdraw())
                 .bounds(leftPos + 90, topPos + 103, 78, 20)
                 .build());
+
+        associatesButton = addRenderableWidget(TreasuryButton.builder(
+                        Component.translatable(
+                                "screen.numismatics_treasury.player_shop.associates"),
+                        ignored -> openAssociates())
+                .bounds(leftPos + 8, topPos + 129, 160, 20)
+                .build());
         updateButtons();
     }
 
@@ -122,6 +130,9 @@ public final class PlayerShopManagementScreen
         if (withdrawButton != null) {
             withdrawButton.active = menu.stock() > 0L && menu.inputStack().isEmpty();
         }
+        if (associatesButton != null) {
+            associatesButton.active = menu.canEditRevenueSplit();
+        }
     }
 
     private void save() {
@@ -136,6 +147,12 @@ public final class PlayerShopManagementScreen
         JsonObject data = new JsonObject();
         data.addProperty("pos", menu.blockPos().asLong());
         TreasuryNetwork.sendAction("player_shop_menu_withdraw", data);
+    }
+
+    private void openAssociates() {
+        JsonObject data = new JsonObject();
+        data.addProperty("pos", menu.blockPos().asLong());
+        TreasuryNetwork.sendAction("player_shop_open_associates", data);
     }
 
     @Override
@@ -199,12 +216,12 @@ public final class PlayerShopManagementScreen
                 slotBackground(
                         graphics,
                         leftPos + 7 + column * 18,
-                        topPos + 146 + row * 18
+                        topPos + 173 + row * 18
                 );
             }
         }
         for (int column = 0; column < 9; column++) {
-            slotBackground(graphics, leftPos + 7 + column * 18, topPos + 204);
+            slotBackground(graphics, leftPos + 7 + column * 18, topPos + 231);
         }
     }
 
@@ -253,14 +270,11 @@ public final class PlayerShopManagementScreen
                 TEXT,
                 false
         );
-        graphics.drawString(
-                font,
-                Component.translatable("screen.numismatics_treasury.player_shop.shift_click_help"),
-                8,
-                126,
-                MUTED,
-                false
-        );
+        Component hint = Component.translatable(
+                "screen.numismatics_treasury.player_shop.shift_click_help");
+        graphics.drawString(font,
+                font.plainSubstrByWidth(hint.getString(), imageWidth - 16),
+                8, 153, MUTED, false);
         graphics.drawString(
                 font,
                 Component.translatable("screen.numismatics_treasury.inventory"),

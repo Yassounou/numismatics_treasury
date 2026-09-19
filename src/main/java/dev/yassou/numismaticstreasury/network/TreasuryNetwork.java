@@ -10,6 +10,7 @@ import dev.yassou.numismaticstreasury.network.payload.TreasuryActionPayload;
 import dev.yassou.numismaticstreasury.server.BankService;
 import dev.yassou.numismaticstreasury.server.auction.AuctionListing;
 import dev.yassou.numismaticstreasury.server.auction.TreasuryData;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,7 +22,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class TreasuryNetwork {
     public static final Gson GSON = new Gson();
-    private static final String PROTOCOL_VERSION = "2";
+    private static final String PROTOCOL_VERSION = "4";
 
     private TreasuryNetwork() {
     }
@@ -90,6 +91,31 @@ public final class TreasuryNetwork {
         open(player, "player_shop_admin", playerShopData(player, shop));
     }
 
+    public static void openPlayerShopAssociates(
+            ServerPlayer player,
+            ServerShopBlockEntity shop
+    ) {
+        JsonObject data = new JsonObject();
+        data.addProperty("pos", shop.getBlockPos().asLong());
+        data.addProperty("ownerName", shop.ownerName());
+        data.addProperty("linkedTotal", shop.linkedPercentTotal());
+        data.addProperty("maxAssociates", ServerShopBlockEntity.MAX_LINKED_PLAYERS);
+        JsonArray playerNames = new JsonArray();
+        BankService.recipientNames(player.getServer(), shop.ownerUuid())
+                .forEach(playerNames::add);
+        data.add("playerNames", playerNames);
+        JsonArray associates = new JsonArray();
+        for (ServerShopBlockEntity.LinkedPlayer linked : shop.linkedPlayers()) {
+            JsonObject value = new JsonObject();
+            value.addProperty("uuid", linked.uuid().toString());
+            value.addProperty("name", linked.name());
+            value.addProperty("percent", linked.percent());
+            associates.add(value);
+        }
+        data.add("associates", associates);
+        open(player, "player_shop_associates", data);
+    }
+
     private static JsonObject playerShopData(
             ServerPlayer player,
             ServerShopBlockEntity shop
@@ -107,7 +133,7 @@ public final class TreasuryNetwork {
         data.addProperty("price", shop.price());
         data.addProperty("lotSize", shop.lotSize());
         data.addProperty("balance", BankService.balance(player));
-        addItem(data, shop.template());
+        addItem(data, shop.template(), player.registryAccess(), true);
         return data;
     }
 
@@ -178,14 +204,19 @@ public final class TreasuryNetwork {
             value.addProperty("expiresAt", listing.expiresAt());
             value.addProperty("revision", listing.revision());
             value.addProperty("mine", listing.sellerUuid().equals(player.getUUID()));
-            addItem(value, listing.item());
+            addItem(value, listing.item(), player.registryAccess(), false);
             listings.add(value);
         }
         data.add("listings", listings);
         open(player, screen, data);
     }
 
-    public static void addItem(JsonObject data, ItemStack stack) {
+    public static void addItem(
+            JsonObject data,
+            ItemStack stack,
+            HolderLookup.Provider registries,
+            boolean includeComponents
+    ) {
         if (stack == null || stack.isEmpty()) {
             data.addProperty("itemId", "minecraft:air");
             data.addProperty("itemName", "No item");
@@ -195,6 +226,9 @@ public final class TreasuryNetwork {
         data.addProperty("itemId", BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
         data.addProperty("itemName", stack.getHoverName().getString());
         data.addProperty("count", stack.getCount());
+        if (includeComponents) {
+            data.addProperty("itemNbt", stack.saveOptional(registries).toString());
+        }
     }
 
     private static void open(ServerPlayer player, String screen, JsonObject data) {

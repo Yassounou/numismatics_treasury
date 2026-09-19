@@ -21,6 +21,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +52,10 @@ public final class ServerActionHandler {
                 case "player_shop_trade" -> tradePlayerShop(player, data);
                 case "player_shop_menu_config" -> configurePlayerShopMenu(player, data);
                 case "player_shop_menu_withdraw" -> withdrawPlayerShopMenu(player, data);
+                case "player_shop_open_associates" -> openPlayerShopAssociates(player, data);
+                case "player_shop_associate_save" -> savePlayerShopAssociate(player, data);
+                case "player_shop_associate_remove" -> removePlayerShopAssociate(player, data);
+                case "player_shop_associate_back" -> backToPlayerShop(player, data);
                 case "auction_create" -> auctionCreate(player, data);
                 case "auction_buy" -> auctionBuy(player, data);
                 case "auction_bid" -> auctionBid(player, data);
@@ -352,6 +358,150 @@ public final class ServerActionHandler {
         }
     }
 
+    private static void openPlayerShopAssociates(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop == null) return;
+        if (!(player.containerMenu instanceof PlayerShopMenu menu)
+                || !menu.matches(shop)) {
+            message(player, false, "message.numismatics_treasury.player_shop.menu_invalid");
+            return;
+        }
+        if (!shop.canEditRevenueSplit(player)) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.split_owner_only");
+            return;
+        }
+        player.closeContainer();
+        TreasuryNetwork.openPlayerShopAssociates(player, shop);
+    }
+
+    private static void savePlayerShopAssociate(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = editablePlayerShop(player, data);
+        if (shop == null) return;
+
+        String linkedName = data.get("linkedPlayer").getAsString().strip();
+        if (linkedName.isEmpty()) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.link_name_required");
+            return;
+        }
+
+        int percent = data.get("linkedPercent").getAsInt();
+        if (percent < 1 || percent > 100) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.split_invalid");
+            return;
+        }
+        Optional<GameProfile> linkedProfile = ProfileResolver.resolve(
+                player.getServer(), linkedName);
+        if (linkedProfile.isEmpty()) {
+            message(player, false,
+                    "message.numismatics_treasury.player_unknown", linkedName);
+            return;
+        }
+        GameProfile profile = linkedProfile.get();
+        if (profile.getId().equals(shop.ownerUuid())) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.link_self");
+            return;
+        }
+        if (BankService.existingAccount(profile.getId()) == null) {
+            message(player, false,
+                    "message.numismatics_treasury.pay.no_account", profile.getName());
+            return;
+        }
+
+        int previousPercent = shop.linkedPlayers().stream()
+                .filter(linked -> linked.uuid().equals(profile.getId()))
+                .mapToInt(ServerShopBlockEntity.LinkedPlayer::percent)
+                .findFirst()
+                .orElse(0);
+        if (shop.linkedPercentTotal() - previousPercent + percent > 100) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.split_total_too_large");
+            return;
+        }
+        if (previousPercent == 0
+                && shop.linkedPlayers().size()
+                >= ServerShopBlockEntity.MAX_LINKED_PLAYERS) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.link_limit",
+                    ServerShopBlockEntity.MAX_LINKED_PLAYERS);
+            return;
+        }
+        if (!shop.setLinkedPlayer(profile.getId(), profile.getName(), percent)) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.split_invalid");
+            return;
+        }
+        message(player, true,
+                "message.numismatics_treasury.player_shop.link_saved",
+                profile.getName(), percent);
+        if (previousPercent == 0) {
+            notifyPlayerShopAssociateAdded(
+                    player,
+                    profile.getId(),
+                    shop.ownerName(),
+                    percent
+            );
+        } else if (previousPercent != percent) {
+            notifyPlayerShopAssociateShareChanged(
+                    player,
+                    profile.getId(),
+                    shop.ownerName(),
+                    previousPercent,
+                    percent
+            );
+        }
+        TreasuryNetwork.openPlayerShopAssociates(player, shop);
+    }
+
+    private static void removePlayerShopAssociate(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = editablePlayerShop(player, data);
+        if (shop == null) return;
+        UUID linkedUuid = UUID.fromString(data.get("linkedUuid").getAsString());
+        ServerShopBlockEntity.LinkedPlayer linked = shop.linkedPlayers().stream()
+                .filter(value -> value.uuid().equals(linkedUuid))
+                .findFirst()
+                .orElse(null);
+        if (linked == null || !shop.removeLinkedPlayer(linkedUuid)) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.link_not_found", "?");
+            return;
+        }
+        message(player, true,
+                "message.numismatics_treasury.player_shop.link_removed", linked.name());
+        TreasuryNetwork.openPlayerShopAssociates(player, shop);
+    }
+
+    private static void backToPlayerShop(ServerPlayer player, JsonObject data) {
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop != null) player.openMenu(shop);
+    }
+
+    private static ServerShopBlockEntity editablePlayerShop(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop == null) return null;
+        if (!shop.canEditRevenueSplit(player)) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.split_owner_only");
+            return null;
+        }
+        return shop;
+    }
+
     private static void depositPlayerShop(ServerPlayer player, JsonObject data) {
         ServerShopBlockEntity shop = playerShop(player, data, true);
         if (shop == null) return;
@@ -411,7 +561,7 @@ public final class ServerActionHandler {
             TreasuryNetwork.openPlayerShop(player, shop);
             return;
         }
-        if (shop.ownerUuid() == null || player.getUUID().equals(shop.ownerUuid())) {
+        if (shop.ownerUuid() == null || shop.isAssociated(player.getUUID())) {
             message(player, false, "message.numismatics_treasury.player_shop.own_shop");
             return;
         }
@@ -434,19 +584,57 @@ public final class ServerActionHandler {
             return;
         }
         UUID ownerUuid = shop.ownerUuid();
+        List<RevenueShare> linkedShares = new ArrayList<>();
+        int linkedTotal = 0;
+        for (ServerShopBlockEntity.LinkedPlayer linkedPlayer : shop.linkedPlayers()) {
+            int amount = shop.linkedPlayerShare(linkedPlayer, total);
+            linkedTotal += amount;
+            if (amount > 0) {
+                linkedShares.add(new RevenueShare(linkedPlayer.uuid(), amount));
+            }
+        }
+        int ownerShare = total - linkedTotal;
         if (BankService.existingAccount(ownerUuid) == null) {
             message(player, false, "message.numismatics_treasury.player_shop.owner_account_unavailable");
+        } else if (linkedShares.stream().anyMatch(share ->
+                BankService.existingAccount(share.playerUuid()) == null)) {
+            message(player, false,
+                    "message.numismatics_treasury.player_shop.linked_account_unavailable");
         } else if (!BankService.debit(player, total)) {
             message(player, false, "message.numismatics_treasury.balance_insufficient",
                     BankService.balance(player));
-        } else if (!BankService.credit(ownerUuid, total)) {
-            BankService.credit(player, total);
-            message(player, false, "message.numismatics_treasury.player_shop.owner_account_unavailable");
         } else {
-            shop.removeStock(quantity);
-            InventoryUtil.give(player, template, quantity);
-            message(player, true, "message.numismatics_treasury.player_shop.purchase", total);
-            notifyPlayerShopOwner(player, shop, template, quantity, total);
+            List<RevenueShare> credited = new ArrayList<>();
+            boolean creditedAll = creditRevenueShare(
+                    credited, new RevenueShare(ownerUuid, ownerShare));
+            for (RevenueShare share : linkedShares) {
+                if (!creditedAll) break;
+                creditedAll = creditRevenueShare(credited, share);
+            }
+            if (!creditedAll) {
+                for (RevenueShare share : credited) {
+                    BankService.debit(share.playerUuid(), share.amount());
+                }
+                BankService.credit(player, total);
+                message(player, false,
+                        "message.numismatics_treasury.player_shop.payment_failed");
+            } else {
+                shop.removeStock(quantity);
+                InventoryUtil.give(player, template, quantity);
+                message(player, true,
+                        "message.numismatics_treasury.player_shop.purchase", total);
+                notifyPlayerShopBeneficiary(
+                        player, ownerUuid, template, quantity, ownerShare);
+                for (RevenueShare share : linkedShares) {
+                    notifyPlayerShopBeneficiary(
+                            player,
+                            share.playerUuid(),
+                            template,
+                            quantity,
+                            share.amount()
+                    );
+                }
+            }
         }
         TreasuryNetwork.openPlayerShop(player, shop);
     }
@@ -489,34 +677,94 @@ public final class ServerActionHandler {
         return shop;
     }
 
-    private static void notifyPlayerShopOwner(
+    private static void notifyPlayerShopBeneficiary(
             ServerPlayer buyer,
-            ServerShopBlockEntity shop,
+            UUID beneficiaryUuid,
             ItemStack item,
             int quantity,
-            int total
+            int received
     ) {
-        UUID ownerUuid = shop.ownerUuid();
-        if (ownerUuid == null) return;
+        if (beneficiaryUuid == null) return;
         Object[] arguments = {
                 buyer.getGameProfile().getName(),
                 item.getHoverName().getString(),
                 quantity,
-                total
+                received
         };
-        ServerPlayer owner = buyer.getServer().getPlayerList().getPlayer(ownerUuid);
-        if (owner != null) {
-            owner.sendSystemMessage(Component.translatable(
+        ServerPlayer beneficiary = buyer.getServer().getPlayerList()
+                .getPlayer(beneficiaryUuid);
+        if (beneficiary != null) {
+            beneficiary.sendSystemMessage(Component.translatable(
                     "notification.numismatics_treasury.player_shop.sold",
                     arguments
             ));
         } else {
             TreasuryData.get(buyer.getServer()).addNotification(
-                    ownerUuid,
+                    beneficiaryUuid,
                     "notification.numismatics_treasury.player_shop.sold",
                     arguments
             );
         }
+    }
+
+    private static void notifyPlayerShopAssociateAdded(
+            ServerPlayer editor,
+            UUID associateUuid,
+            String ownerName,
+            int percent
+    ) {
+        Object[] arguments = {ownerName, percent};
+        ServerPlayer associate = editor.getServer().getPlayerList()
+                .getPlayer(associateUuid);
+        if (associate != null) {
+            associate.sendSystemMessage(Component.translatable(
+                    "notification.numismatics_treasury.player_shop.associate_added",
+                    arguments
+            ));
+        } else {
+            TreasuryData.get(editor.getServer()).addNotification(
+                    associateUuid,
+                    "notification.numismatics_treasury.player_shop.associate_added",
+                    arguments
+            );
+        }
+    }
+
+    private static void notifyPlayerShopAssociateShareChanged(
+            ServerPlayer editor,
+            UUID associateUuid,
+            String ownerName,
+            int previousPercent,
+            int percent
+    ) {
+        Object[] arguments = {ownerName, previousPercent, percent};
+        ServerPlayer associate = editor.getServer().getPlayerList()
+                .getPlayer(associateUuid);
+        if (associate != null) {
+            associate.sendSystemMessage(Component.translatable(
+                    "notification.numismatics_treasury.player_shop.associate_share_changed",
+                    arguments
+            ));
+        } else {
+            TreasuryData.get(editor.getServer()).addNotification(
+                    associateUuid,
+                    "notification.numismatics_treasury.player_shop.associate_share_changed",
+                    arguments
+            );
+        }
+    }
+
+    private static boolean creditRevenueShare(
+            List<RevenueShare> credited,
+            RevenueShare share
+    ) {
+        if (share.amount() <= 0) return true;
+        if (!BankService.credit(share.playerUuid(), share.amount())) return false;
+        credited.add(share);
+        return true;
+    }
+
+    private record RevenueShare(UUID playerUuid, int amount) {
     }
 
     private static void auctionCreate(ServerPlayer player, JsonObject data) {

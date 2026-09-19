@@ -7,6 +7,8 @@ import dev.yassou.numismaticstreasury.menu.PlayerShopMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -23,10 +25,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ServerShopBlockEntity extends BlockEntity implements MenuProvider {
     private static final int MAX_LOT_SIZE = 2_304;
+    public static final int MAX_LINKED_PLAYERS = 16;
 
     private ShopMode mode = ShopMode.SELL_TO_PLAYER;
     private ItemStack template = ItemStack.EMPTY;
@@ -34,6 +40,7 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     private int lotSize = 1;
     private UUID ownerUuid;
     private String ownerName = "";
+    private final Map<UUID, LinkedPlayer> linkedPlayers = new LinkedHashMap<>();
     private long stock;
     private final IItemHandler automatedInput = new IItemHandler() {
         @Override
@@ -92,6 +99,7 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     public int lotSize() { return lotSize; }
     @Nullable public UUID ownerUuid() { return ownerUuid; }
     public String ownerName() { return ownerName; }
+    public List<LinkedPlayer> linkedPlayers() { return List.copyOf(linkedPlayers.values()); }
     public long stock() { return stock; }
     public boolean configured() { return !template.isEmpty() && price > 0; }
 
@@ -110,13 +118,62 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
 
     public boolean canManage(Player player) {
         return player.hasPermissions(2)
+                || ownerUuid != null && ownerUuid.equals(player.getUUID())
+                || linkedPlayers.containsKey(player.getUUID());
+    }
+
+    public boolean canEditRevenueSplit(Player player) {
+        return player.hasPermissions(2)
                 || ownerUuid != null && ownerUuid.equals(player.getUUID());
+    }
+
+    public boolean isAssociated(UUID playerUuid) {
+        return playerUuid != null
+                && (playerUuid.equals(ownerUuid) || linkedPlayers.containsKey(playerUuid));
     }
 
     public void setOwner(UUID ownerUuid, String ownerName) {
         this.ownerUuid = ownerUuid;
         this.ownerName = ownerName == null ? "" : ownerName;
         sync();
+    }
+
+    public boolean setLinkedPlayer(UUID playerUuid, String playerName, int percent) {
+        if (playerUuid == null || playerUuid.equals(ownerUuid)
+                || percent <= 0 || percent > 100
+                || !linkedPlayers.containsKey(playerUuid)
+                && linkedPlayers.size() >= MAX_LINKED_PLAYERS) {
+            return false;
+        }
+        int otherPercent = linkedPlayers.values().stream()
+                .filter(linked -> !linked.uuid().equals(playerUuid))
+                .mapToInt(LinkedPlayer::percent)
+                .sum();
+        if (otherPercent + percent > 100) return false;
+        linkedPlayers.put(playerUuid, new LinkedPlayer(
+                playerUuid,
+                playerName == null ? "" : playerName,
+                percent
+        ));
+        sync();
+        return true;
+    }
+
+    public boolean removeLinkedPlayer(UUID playerUuid) {
+        if (linkedPlayers.remove(playerUuid) == null) return false;
+        sync();
+        return true;
+    }
+
+    public int linkedPercentTotal() {
+        return linkedPlayers.values().stream()
+                .mapToInt(LinkedPlayer::percent)
+                .sum();
+    }
+
+    public int linkedPlayerShare(LinkedPlayer linkedPlayer, int total) {
+        if (total <= 0 || linkedPlayer == null || linkedPlayer.percent() <= 0) return 0;
+        return (int) ((long) total * linkedPlayer.percent() / 100L);
     }
 
     @Override
@@ -142,6 +199,8 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     ) {
         buffer.writeBlockPos(worldPosition);
         buffer.writeUtf(ownerName, 64);
+        buffer.writeBoolean(menu instanceof PlayerShopMenu playerShopMenu
+                && playerShopMenu.canEditRevenueSplit());
         ItemStack.OPTIONAL_STREAM_CODEC.encode(buffer, template);
         buffer.writeVarInt(price);
         buffer.writeVarLong(stock);
@@ -205,6 +264,38 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
                 : 1;
         ownerUuid = tag.hasUUID("ownerUuid") ? tag.getUUID("ownerUuid") : null;
         ownerName = tag.getString("ownerName");
+        linkedPlayers.clear();
+        ListTag savedLinkedPlayers = tag.getList("linkedPlayers", Tag.TAG_COMPOUND);
+        for (Tag value : savedLinkedPlayers) {
+            if (!(value instanceof CompoundTag linkedTag)
+                    || !linkedTag.hasUUID("uuid")
+                    || linkedPlayers.size() >= MAX_LINKED_PLAYERS) {
+                continue;
+            }
+            UUID uuid = linkedTag.getUUID("uuid");
+            int percent = linkedTag.getInt("percent");
+            if (uuid.equals(ownerUuid) || percent <= 0 || percent > 100
+                    || linkedPercentTotal() + percent > 100) {
+                continue;
+            }
+            linkedPlayers.put(uuid, new LinkedPlayer(
+                    uuid,
+                    linkedTag.getString("name"),
+                    percent
+            ));
+        }
+        if (linkedPlayers.isEmpty() && tag.hasUUID("linkedPlayerUuid")) {
+            UUID legacyUuid = tag.getUUID("linkedPlayerUuid");
+            int legacyPercent = tag.getInt("linkedPlayerPercent");
+            if (!legacyUuid.equals(ownerUuid) && legacyPercent > 0
+                    && legacyPercent <= 100) {
+                linkedPlayers.put(legacyUuid, new LinkedPlayer(
+                        legacyUuid,
+                        tag.getString("linkedPlayerName"),
+                        legacyPercent
+                ));
+            }
+        }
         stock = Math.max(0L, tag.getLong("stock"));
     }
 
@@ -217,6 +308,15 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
         tag.putInt("lotSize", lotSize);
         if (ownerUuid != null) tag.putUUID("ownerUuid", ownerUuid);
         tag.putString("ownerName", ownerName);
+        ListTag linkedPlayerTags = new ListTag();
+        for (LinkedPlayer linkedPlayer : linkedPlayers.values()) {
+            CompoundTag linkedTag = new CompoundTag();
+            linkedTag.putUUID("uuid", linkedPlayer.uuid());
+            linkedTag.putString("name", linkedPlayer.name());
+            linkedTag.putInt("percent", linkedPlayer.percent());
+            linkedPlayerTags.add(linkedTag);
+        }
+        tag.put("linkedPlayers", linkedPlayerTags);
         tag.putLong("stock", stock);
     }
 
@@ -229,5 +329,8 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
         return saveWithoutMetadata(registries);
+    }
+
+    public record LinkedPlayer(UUID uuid, String name, int percent) {
     }
 }

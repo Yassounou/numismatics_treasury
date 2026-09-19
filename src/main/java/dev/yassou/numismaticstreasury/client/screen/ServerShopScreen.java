@@ -15,7 +15,6 @@ public final class ServerShopScreen extends TreasuryScreen {
     private final long pos;
     private final int balance;
     private final ItemStack configuredItem;
-    private final String configuredItemName;
     private String mode;
     private final int initialPrice;
     private final int initialLotSize;
@@ -34,11 +33,6 @@ public final class ServerShopScreen extends TreasuryScreen {
         pos = ClientScreenData.longValue(data, "pos", 0L);
         balance = ClientScreenData.integer(data, "balance", 0);
         configuredItem = ClientScreenData.item(data);
-        configuredItemName = ClientScreenData.string(
-                data,
-                "itemName",
-                Component.translatable("screen.numismatics_treasury.no_item").getString()
-        );
         mode = ClientScreenData.string(data, "mode", "SELL_TO_PLAYER");
         initialPrice = ClientScreenData.integer(data, "price", 0);
         initialLotSize = Math.max(1, ClientScreenData.integer(data, "lotSize", 1));
@@ -216,11 +210,7 @@ public final class ServerShopScreen extends TreasuryScreen {
         if (selected.isEmpty()) {
             return Component.translatable("screen.numismatics_treasury.no_item");
         }
-        if (admin && inventoryPicker != null && minecraft != null && minecraft.player != null
-                && !inventoryPicker.selectedStack(minecraft.player).isEmpty()) {
-            return selected.getHoverName();
-        }
-        return Component.literal(configuredItemName);
+        return selected.getHoverName();
     }
 
     private void updateAction() {
@@ -296,7 +286,18 @@ public final class ServerShopScreen extends TreasuryScreen {
         super.render(graphics, mouseX, mouseY, partialTick);
         if (admin && inventoryPicker != null && minecraft != null && minecraft.player != null) {
             ItemStack hovered = inventoryPicker.hoveredStack(minecraft.player, mouseX, mouseY);
-            if (!hovered.isEmpty()) graphics.renderTooltip(font, hovered, mouseX, mouseY);
+            if (!hovered.isEmpty()) {
+                graphics.renderTooltip(font, hovered, mouseX, mouseY);
+                return;
+            }
+        }
+        ItemStack shown = previewStack();
+        int cardX = panelLeft + 14;
+        int cardY = panelTop + 40;
+        if (!shown.isEmpty()
+                && mouseX >= cardX && mouseX < cardX + panelWidth - 28
+                && mouseY >= cardY && mouseY < cardY + 48) {
+            graphics.renderTooltip(font, shown, mouseX, mouseY);
         }
     }
 

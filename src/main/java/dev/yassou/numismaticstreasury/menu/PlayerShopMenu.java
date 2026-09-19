@@ -26,6 +26,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
     private final ContainerData data;
     private final BlockPos pos;
     private final String ownerName;
+    private final boolean canEditRevenueSplit;
     private final ItemStack initialShopItem;
     @Nullable private final ServerShopBlockEntity shop;
     private boolean handlingInput;
@@ -42,6 +43,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                 new SimpleContainerData(4),
                 buffer.readBlockPos(),
                 buffer.readUtf(64),
+                buffer.readBoolean(),
                 ItemStack.OPTIONAL_STREAM_CODEC.decode(buffer),
                 buffer.readVarInt(),
                 buffer.readVarLong(),
@@ -61,6 +63,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                 serverData(shop),
                 shop.getBlockPos(),
                 shop.ownerName(),
+                shop.canEditRevenueSplit(playerInventory.player),
                 shop.template(),
                 shop.price(),
                 shop.stock(),
@@ -75,6 +78,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
             ContainerData data,
             BlockPos pos,
             String ownerName,
+            boolean canEditRevenueSplit,
             ItemStack initialShopItem,
             int initialPrice,
             long initialStock,
@@ -85,6 +89,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
         this.data = data;
         this.pos = pos;
         this.ownerName = ownerName;
+        this.canEditRevenueSplit = canEditRevenueSplit;
         this.initialShopItem = initialShopItem.copyWithCount(1);
         if (shop == null) {
             data.set(0, initialPrice);
@@ -105,7 +110,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                         playerInventory,
                         column + row * 9 + 9,
                         8 + column * 18,
-                        147 + row * 18
+                        174 + row * 18
                 ));
             }
         }
@@ -114,7 +119,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                     playerInventory,
                     column,
                     8 + column * 18,
-                    205
+                    232
             ));
         }
         addDataSlots(data);
@@ -151,6 +156,10 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
 
     public String ownerName() {
         return ownerName;
+    }
+
+    public boolean canEditRevenueSplit() {
+        return canEditRevenueSplit;
     }
 
     public int price() {
@@ -253,4 +262,5 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
         handlingInput = false;
         broadcastChanges();
     }
+
 }

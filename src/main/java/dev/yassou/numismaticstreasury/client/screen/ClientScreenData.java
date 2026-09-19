@@ -1,8 +1,11 @@
 package dev.yassou.numismaticstreasury.client.screen;
 
 import com.google.gson.JsonObject;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -18,6 +21,17 @@ final class ClientScreenData {
     }
 
     static ItemStack item(JsonObject data) {
+        if (data.has("itemNbt") && Minecraft.getInstance().level != null) {
+            try {
+                ItemStack decoded = ItemStack.parseOptional(
+                        Minecraft.getInstance().level.registryAccess(),
+                        TagParser.parseTag(data.get("itemNbt").getAsString())
+                );
+                if (!decoded.isEmpty()) return decoded;
+            } catch (CommandSyntaxException ignored) {
+                // Retain the id/count fallback for older or malformed payloads.
+            }
+        }
         ResourceLocation id = ResourceLocation.tryParse(string(data, "itemId", "minecraft:air"));
         Item item = id == null ? Items.AIR : BuiltInRegistries.ITEM.get(id);
         int count = integer(data, "count", 0);

@@ -1,98 +1,123 @@
-# Numismatics Treasury 1.0.2
+# Numismatics Treasury 1.2.0
 
-Addon NeoForge 1.21.1 pour Numismatics, développé sous le namespace
-`numismatics_treasury` et le package `dev.yassou.numismaticstreasury`.
+Numismatics Treasury is a NeoForge 1.21.1 addon for Numismatics. It expands
+the banking system with direct transfers, configurable shops, player-owned
+stores, and a global Auction House.
 
-## Fonctionnalités
+All transactions use Numismatics bank accounts directly. Players do not need
+to carry physical coins or manually convert currency before buying, selling,
+bidding, or transferring money.
 
-- `/pay <pseudo> <montant>` : transfert direct entre deux comptes bancaires
-  Numismatics, y compris vers un joueur hors ligne déjà connu du serveur.
-- Guichet de virement : même transfert dans une interface dédiée.
-- Terminal de transfert portable : ouvre cette interface directement depuis
-  la main, sans bloc à proximité.
-- Shop serveur : vente ou rachat d'un objet par unité ou par lot, stock et
-  argent serveur infinis, paiement exclusivement depuis le compte bancaire du
-  joueur.
-- Shop joueur : un seul type d'objet, stock à capacité illimitée et versement
-  direct des ventes sur le compte Numismatics du propriétaire. Le propriétaire
-  configure le nombre d'objets et le prix de chaque lot. Les entonnoirs vanilla
-  et les systèmes d'insertion de Create peuvent l'alimenter, mais uniquement
-  avec l'objet configuré.
-- Hôtel des ventes global : ventes directes, enchères avec argent bloqué,
-  expirations, commission configurable et récupération sécurisée des objets.
-- Interfaces sombres sans flou vanilla, boutons et cadres adaptés dans le
-  namespace propre au mod.
+The mod includes English text and a complete French translation.
 
-## Utilisation
+## Features
 
-- Clic droit sur le shop : ouvrir le commerce.
-- Maj + clic droit par un opérateur sur le shop : choisir l'objet tenu en main,
-  le sens achat/vente, le nombre d'objets par lot et le prix du lot.
-- Maj + clic droit sur son shop joueur : choisir l'objet, la taille et le prix
-  du lot, puis transférer les piles vers le véritable slot d'entrée avec la
-  combinaison Maj + clic. Seul
-  son propriétaire (ou un opérateur) peut le modifier et il faut vider tout
-  son stock avant de le casser.
-- Clic droit sur n'importe quel hôtel des ventes : ouvrir le marché global.
-- Pour publier une annonce, sélectionner une pile dans l'inventaire affiché,
-  puis définir son prix, son type et sa durée.
-- Clic droit sur le guichet de virement : saisir le pseudo et le montant.
-- Dans le guichet, la touche Tab complète les pseudonymes connus, y compris
-  ceux des joueurs hors ligne possédant déjà un compte Numismatics.
-- Dans la configuration du shop et la création d'annonce, cliquer sur une pile
-  de l'inventaire affiché pour la placer dans la case d'objet.
+- `/pay <player> <amount>` transfers money directly between Numismatics bank
+  accounts, including accounts belonging to known offline players.
+- The Transfer Teller provides the same transfer system through a dedicated
+  interface.
+- The Portable Transfer Terminal opens the transfer interface without a
+  placed block.
+- Server Shops let operators configure an item, a transaction type, an item
+  quantity per lot, and a lot price. Server stock and funds are unlimited.
+- Player Shops sell one configured item, have unlimited-capacity stock, and
+  deposit revenue directly into Numismatics bank accounts.
+- Player Shops accept automatic insertion from vanilla hoppers, Create
+  funnels, and compatible item-transfer systems while rejecting items that do
+  not match the configured filter.
+- The global Auction House supports direct sales, timed auctions, held bids,
+  configurable commissions, search, notifications, and safe item claims.
+- The custom interfaces use the visual direction of Numismatics and include
+  full item tooltips, enchantments, custom lore, and modded components.
 
-Toutes les actions importantes utilisent une confirmation en deux clics.
+## Player Shop Associates
 
-## Configuration serveur
+A Player Shop can have up to 16 associates. The owner manages them from a
+dedicated scrollable screen and assigns an individual revenue percentage to
+each associate.
 
-Le fichier `config/numismatics_treasury.json` est créé au premier lancement.
-Il permet notamment de désactiver indépendamment :
+- The combined associate shares cannot exceed 100%.
+- The owner receives the remaining revenue and all rounding differences.
+- Payments are distributed directly to every beneficiary's Numismatics bank
+  account after each sale.
+- The player-name field supports Tab and Shift+Tab completion for known
+  Numismatics accounts, including offline players.
+- Associates are notified when they are added and whenever their revenue
+  percentage changes. Offline notifications are delivered on their next
+  login.
+- Associates can manage the shop, but only the owner or a server operator can
+  edit the associate list and revenue percentages.
+- Existing shops using the former single-associate format are migrated
+  automatically.
 
-- la commande `/pay` ;
-- le guichet de virement ;
-- le terminal de transfert portable ;
-- le shop serveur ;
-- le shop joueur ;
-- l'hôtel des ventes.
+## Usage
 
-Il configure aussi les limites de paiement, la commission, le nombre maximal
-d'annonces, les prix et les durées autorisées. Après modification :
+- Right-click a shop to open it.
+- Sneak and right-click a Server Shop as an operator to configure its item,
+  transaction type, lot size, and lot price.
+- Sneak and right-click a Player Shop as its owner, an associate, or an
+  operator to manage its item, stock, lot size, and lot price.
+- Use the **Associates** button in Player Shop management to configure shared
+  access and revenue distribution.
+- Shift-click inventory stacks into the Player Shop input slot to add them to
+  its stock.
+- A Player Shop cannot be broken until its stock is empty.
+- Right-click any Auction House block to open the server-wide marketplace.
+- Right-click a Transfer Teller, or use a Portable Transfer Terminal, to enter
+  a recipient and an amount. Press Tab to complete known player names.
+
+## Server Configuration
+
+The server configuration is generated at:
+
+```text
+config/numismatics_treasury.json
+```
+
+It can independently enable or disable:
+
+- `/pay`
+- Transfer Teller
+- Portable Transfer Terminal
+- Server Shop
+- Player Shop
+- Auction House
+
+It also controls payment limits, Auction House commissions, listing limits,
+price limits, and allowed listing durations.
+
+Reload the configuration without restarting the server:
 
 ```text
 /numismatics_treasury reload
 ```
 
-Quand un module de bloc est désactivé, sa recette disparaît au rechargement et
-le bloc éventuellement déjà placé devient inactif sans être supprimé du monde.
-Le shop serveur n'a volontairement aucune recette. Les recettes du shop joueur,
-du guichet de virement et de l'hôtel des ventes utilisent toutes du laiton.
+This command requires operator permissions. The configuration only needs to
+be edited on the server; relevant settings are synchronized to clients.
 
-## Dépendances
+When a block module is disabled, its crafting recipe is removed after the
+configuration reload and existing placed blocks become inactive. Server Shops
+intentionally have no crafting recipe.
+
+## Requirements
 
 - Minecraft 1.21.1
-- NeoForge 21.1.242 ou ultérieur pour Minecraft 1.21.1
-- Numismatics 1.0.20 ou ultérieur
+- NeoForge 21.1.242 or later for Minecraft 1.21.1
+- Numismatics 1.0.20 or later
 
-Numismatics est la seule dépendance de mod déclarée par cet addon.
+Numismatics is the only declared mod dependency.
 
 ## Installation
 
-Placez `numismatics_treasury-1.0.2.jar` dans le dossier `mods` du serveur et
-des clients, aux côtés de Numismatics. Le fichier JSON de configuration est
-exclusivement géré par le serveur puis synchronisé vers les clients : il ne
-doit donc être modifié qu'une seule fois, côté serveur.
+Place `numismatics_treasury-1.2.0.jar` in the `mods` directory on both the
+server and clients, alongside Numismatics.
 
-## Construction
+## Building
 
-Numismatics est téléchargé automatiquement depuis son dépôt Maven officiel :
+Numismatics is downloaded automatically from its official Maven repository:
 
 ```text
 ./gradlew build
 ```
 
-Le JAR est généré dans `build/libs/`.
-
-Les interfaces sont écrites en anglais et disposent d'une traduction française
-complète. Les notifications d'achat, de nouvelle enchère, de surenchère et de
-fin d'annonce sont conservées pour les joueurs hors ligne.
+The resulting JAR is generated in `build/libs/`.

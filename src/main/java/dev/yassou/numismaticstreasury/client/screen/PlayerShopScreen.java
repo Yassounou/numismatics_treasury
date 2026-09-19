@@ -19,7 +19,6 @@ public final class PlayerShopScreen extends TreasuryScreen {
     private final long stock;
     private final String ownerName;
     private final ItemStack configuredItem;
-    private final String configuredItemName;
 
     private EditBox valueBox;
     private EditBox lotSizeBox;
@@ -40,11 +39,6 @@ public final class PlayerShopScreen extends TreasuryScreen {
         stock = ClientScreenData.longValue(data, "stock", 0L);
         ownerName = ClientScreenData.string(data, "ownerName", "?");
         configuredItem = ClientScreenData.item(data);
-        configuredItemName = ClientScreenData.string(
-                data,
-                "itemName",
-                Component.translatable("screen.numismatics_treasury.no_item").getString()
-        );
     }
 
     @Override
@@ -174,7 +168,7 @@ public final class PlayerShopScreen extends TreasuryScreen {
         if (!selected.isEmpty()) return selected.getHoverName();
         return configuredItem.isEmpty()
                 ? Component.translatable("screen.numismatics_treasury.no_item")
-                : Component.literal(configuredItemName);
+                : configuredItem.getHoverName();
     }
 
     private Component displayedPrice() {
@@ -269,7 +263,18 @@ public final class PlayerShopScreen extends TreasuryScreen {
                 && minecraft != null && minecraft.player != null) {
             ItemStack hovered = inventoryPicker.hoveredStack(
                     minecraft.player, mouseX, mouseY);
-            if (!hovered.isEmpty()) graphics.renderTooltip(font, hovered, mouseX, mouseY);
+            if (!hovered.isEmpty()) {
+                graphics.renderTooltip(font, hovered, mouseX, mouseY);
+                return;
+            }
+        }
+        ItemStack shown = previewItem();
+        int cardX = panelLeft + 14;
+        int cardY = panelTop + 40;
+        if (!shown.isEmpty()
+                && mouseX >= cardX && mouseX < cardX + panelWidth - 28
+                && mouseY >= cardY && mouseY < cardY + 48) {
+            graphics.renderTooltip(font, shown, mouseX, mouseY);
         }
     }
 
