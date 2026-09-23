@@ -1,6 +1,7 @@
 package dev.yassou.numismaticstreasury.client.screen;
 
 import com.google.gson.JsonObject;
+import dev.yassou.numismaticstreasury.NumismaticsTreasury;
 import dev.yassou.numismaticstreasury.client.gui.MoneyDisplay;
 import dev.yassou.numismaticstreasury.client.gui.TreasuryButton;
 import dev.yassou.numismaticstreasury.client.gui.TreasuryFrame;
@@ -10,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
@@ -21,6 +23,10 @@ public final class PlayerShopManagementScreen
     private static final int MUTED = 0xFFAAAAAA;
     private static final int TEXT = 0xFFF2F2F2;
     private static final int ACCENT = 0xFFE0B04B;
+    private static final ResourceLocation SAVE_ICON = icon("player_shop_save");
+    private static final ResourceLocation WITHDRAW_ICON = icon("player_shop_withdraw");
+    private static final ResourceLocation ASSOCIATES_ICON = icon("player_shop_associates");
+    private static final ResourceLocation STATISTICS_ICON = icon("player_shop_statistics");
 
     private EditBox priceBox;
     private EditBox lotSizeBox;
@@ -35,11 +41,11 @@ public final class PlayerShopManagementScreen
     ) {
         super(menu, inventory, title);
         imageWidth = 176;
-        imageHeight = 255;
+        imageHeight = 229;
         titleLabelX = 10;
         titleLabelY = 10;
         inventoryLabelX = 8;
-        inventoryLabelY = 163;
+        inventoryLabelY = 137;
     }
 
     @Override
@@ -79,26 +85,30 @@ public final class PlayerShopManagementScreen
                         Component.translatable("screen.numismatics_treasury.save"),
                         ignored -> save())
                 .green()
+                .icon(SAVE_ICON)
                 .confirmation(Component.translatable("screen.numismatics_treasury.confirm"))
-                .bounds(leftPos + 8, topPos + 103, 78, 20)
+                .bounds(leftPos + 8, topPos + 103, 37, 20)
                 .build());
         withdrawButton = addRenderableWidget(TreasuryButton.builder(
                         Component.translatable(
                                 "screen.numismatics_treasury.player_shop.withdraw_inventory"),
                         ignored -> withdraw())
-                .bounds(leftPos + 90, topPos + 103, 78, 20)
+                .icon(WITHDRAW_ICON)
+                .bounds(leftPos + 49, topPos + 103, 37, 20)
                 .build());
 
         associatesButton = addRenderableWidget(TreasuryButton.builder(
                         Component.translatable(
                                 "screen.numismatics_treasury.player_shop.associates"),
                         ignored -> openAssociates())
-                .bounds(leftPos + 8, topPos + 129, 78, 20)
+                .icon(ASSOCIATES_ICON)
+                .bounds(leftPos + 90, topPos + 103, 37, 20)
                 .build());
         addRenderableWidget(TreasuryButton.builder(
                         Component.translatable("screen.numismatics_treasury.history.stats"),
                         ignored -> openStats())
-                .bounds(leftPos + 90, topPos + 129, 78, 20)
+                .icon(STATISTICS_ICON)
+                .bounds(leftPos + 131, topPos + 103, 37, 20)
                 .build());
         updateButtons();
     }
@@ -227,12 +237,12 @@ public final class PlayerShopManagementScreen
                 slotBackground(
                         graphics,
                         leftPos + 7 + column * 18,
-                        topPos + 173 + row * 18
+                        topPos + 147 + row * 18
                 );
             }
         }
         for (int column = 0; column < 9; column++) {
-            slotBackground(graphics, leftPos + 7 + column * 18, topPos + 231);
+            slotBackground(graphics, leftPos + 7 + column * 18, topPos + 205);
         }
     }
 
@@ -285,7 +295,7 @@ public final class PlayerShopManagementScreen
                 "screen.numismatics_treasury.player_shop.shift_click_help");
         graphics.drawString(font,
                 font.plainSubstrByWidth(hint.getString(), imageWidth - 16),
-                8, 153, MUTED, false);
+                8, 127, MUTED, false);
         graphics.drawString(
                 font,
                 Component.translatable("screen.numismatics_treasury.inventory"),
@@ -299,5 +309,12 @@ public final class PlayerShopManagementScreen
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static ResourceLocation icon(String name) {
+        return ResourceLocation.fromNamespaceAndPath(
+                NumismaticsTreasury.MOD_ID,
+                "textures/gui/icons/" + name + ".png"
+        );
     }
 }

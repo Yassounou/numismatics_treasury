@@ -15,6 +15,8 @@
 - Added a compact local display-settings panel that can hide the balance badge
   and updated Treasury outlines with the rounded pixel treatment used by the
   balance display.
+- Replaced the Player Shop management actions and History & Statistics tabs
+  with compact, translated icon buttons using dedicated Treasury sprites.
 - Player Shop stock withdrawal now opens a dedicated quantity selector with a
   safe maximum based on the shop stock and available inventory space.
 - Unowned Player Shops placed by a Schematicannon can now be claimed with a

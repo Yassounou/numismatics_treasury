@@ -6,6 +6,7 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -24,6 +25,7 @@ public final class TreasuryButton extends Button {
     private final boolean selected;
     private final OnPress requestedOnPress;
     private final Component confirmationMessage;
+    private final ResourceLocation icon;
     private boolean pressedByMouse;
     private long keyboardPressedUntil;
     private boolean awaitingConfirmation;
@@ -36,6 +38,8 @@ public final class TreasuryButton extends Button {
         selected = builder.selected;
         requestedOnPress = builder.requestedOnPress;
         confirmationMessage = builder.confirmationMessage;
+        icon = builder.icon;
+        if (icon != null) setTooltip(Tooltip.create(getMessage()));
     }
 
     public static Builder builder(Component message, OnPress onPress) {
@@ -74,9 +78,24 @@ public final class TreasuryButton extends Button {
         graphics.setColor(1.0F, 1.0F, 1.0F, alpha);
         RenderSystem.enableBlend();
         graphics.blitSprite(currentSprite(minecraft), getX(), getY(), getWidth(), getHeight());
+        if (icon != null) {
+            graphics.blit(
+                    icon,
+                    getX() + (getWidth() - 16) / 2,
+                    getY() + (getHeight() - 16) / 2,
+                    0,
+                    0,
+                    16,
+                    16,
+                    16,
+                    16
+            );
+        }
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
-        int textColor = getFGColor() | (Mth.ceil(alpha * 255.0F) << 24);
-        renderString(graphics, minecraft.font, textColor);
+        if (icon == null) {
+            int textColor = getFGColor() | (Mth.ceil(alpha * 255.0F) << 24);
+            renderString(graphics, minecraft.font, textColor);
+        }
     }
 
     @Override
@@ -108,7 +127,7 @@ public final class TreasuryButton extends Button {
             if (minecraft.mouseHandler.isLeftPressed()) return green ? GREEN_PRESSED : PRESSED;
             pressedByMouse = false;
         }
-        if (Util.getMillis() < keyboardPressedUntil || selected) {
+        if (Util.getMillis() < keyboardPressedUntil || selected || awaitingConfirmation) {
             return green ? GREEN_PRESSED : PRESSED;
         }
         if (!active) return green ? GREEN_DISABLED : DISABLED;
@@ -125,6 +144,7 @@ public final class TreasuryButton extends Button {
         private boolean selected;
         private final OnPress requestedOnPress;
         private Component confirmationMessage;
+        private ResourceLocation icon;
 
         private Builder(Component message, OnPress onPress) {
             super(message, ignored -> { });
@@ -133,6 +153,7 @@ public final class TreasuryButton extends Button {
 
         public Builder green() { green = true; return this; }
         public Builder selected(boolean value) { selected = value; return this; }
+        public Builder icon(ResourceLocation value) { icon = value; return this; }
         public Builder confirmation(Component message) {
             confirmationMessage = message;
             return this;

@@ -3,6 +3,7 @@ package dev.yassou.numismaticstreasury.client.screen;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import dev.yassou.numismaticstreasury.NumismaticsTreasury;
 import dev.yassou.numismaticstreasury.client.TreasuryClientPreferences;
 import dev.yassou.numismaticstreasury.client.gui.MoneyDisplay;
 import dev.yassou.numismaticstreasury.client.gui.TreasuryButton;
@@ -93,12 +94,13 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int y = panelTop + 36;
         List<Tab> tabs = visibleTabs();
         int gap = 4;
-        int width = (panelWidth - 20 - gap * (tabs.size() - 1)) / tabs.size();
+        int width = 32;
         for (int index = 0; index < tabs.size(); index++) {
             Tab value = tabs.get(index);
             addRenderableWidget(TreasuryButton.builder(
                             Component.translatable(value.key),
                             ignored -> switchTab(value))
+                    .icon(value.icon)
                     .selected(tab == value)
                     .bounds(x + index * (width + gap), y, width, 20)
                     .build());
@@ -640,15 +642,28 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     }
 
     private enum Tab {
-        OVERVIEW("screen.numismatics_treasury.history.tab.overview"),
-        HISTORY("screen.numismatics_treasury.history.tab.history"),
-        SHOPS("screen.numismatics_treasury.history.tab.shops"),
-        SERVER("screen.numismatics_treasury.history.tab.server");
+        OVERVIEW(
+                "screen.numismatics_treasury.history.tab.overview",
+                "history_overview"),
+        HISTORY(
+                "screen.numismatics_treasury.history.tab.history",
+                "history_transactions"),
+        SHOPS(
+                "screen.numismatics_treasury.history.tab.shops",
+                "history_player_shops"),
+        SERVER(
+                "screen.numismatics_treasury.history.tab.server",
+                "history_server");
 
         private final String key;
+        private final ResourceLocation icon;
 
-        Tab(String key) {
+        Tab(String key, String iconName) {
             this.key = key;
+            icon = ResourceLocation.fromNamespaceAndPath(
+                    NumismaticsTreasury.MOD_ID,
+                    "textures/gui/icons/" + iconName + ".png"
+            );
         }
     }
 

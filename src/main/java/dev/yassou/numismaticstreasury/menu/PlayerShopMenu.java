@@ -110,7 +110,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                         playerInventory,
                         column + row * 9 + 9,
                         8 + column * 18,
-                        174 + row * 18
+                        148 + row * 18
                 ));
             }
         }
@@ -119,7 +119,7 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                     playerInventory,
                     column,
                     8 + column * 18,
-                    232
+                    206
             ));
         }
         addDataSlots(data);
