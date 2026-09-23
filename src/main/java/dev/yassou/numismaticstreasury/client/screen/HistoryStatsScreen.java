@@ -30,6 +30,9 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             .withZone(ZoneId.systemDefault());
     private static final int ENTRY_HEIGHT = 31;
     private static final int SHOP_HEIGHT = 43;
+    private static final int OVERVIEW_ROWS = 5;
+    private static final int HISTORY_ROWS = 7;
+    private static final int SHOP_ROWS = 5;
 
     private final String source;
     private final boolean portable;
@@ -44,6 +47,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private Tab tab = Tab.OVERVIEW;
     private int scroll;
     private int selectedShopIndex;
+    private boolean draggingScrollbar;
     private boolean leaving;
 
     public HistoryStatsScreen(String json) {
@@ -112,6 +116,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private void switchTab(Tab value) {
         tab = value;
         scroll = 0;
+        draggingScrollbar = false;
         rebuildScreen();
     }
 
@@ -131,31 +136,56 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                 || mouseY < panelTop + 64 || mouseY >= panelTop + panelHeight - 10) {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
-        int maximum = switch (tab) {
-            case OVERVIEW -> Math.max(0, entries.size() - 5);
-            case HISTORY -> Math.max(0, entries.size() - 7);
-            case SHOPS -> Math.max(0, shops.size() - 5);
-            case SERVER -> 0;
-        };
+        int maximum = maximumScroll();
         scroll = Math.max(0, Math.min(maximum, scroll + (scrollY < 0 ? 1 : -1)));
-        return true;
+        return maximum > 0 || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
-        if (tab != Tab.SHOPS || button != 0) return false;
+        if (button != 0) return false;
+        ScrollbarLayout scrollbar = scrollbarLayout();
+        if (scrollbar != null && scrollbar.contains(mouseX, mouseY)) {
+            draggingScrollbar = maximumScroll() > 0;
+            updateScrollFromMouse(mouseY, scrollbar);
+            return true;
+        }
+        if (tab != Tab.SHOPS) return false;
         int x = panelLeft + 10;
         int y = panelTop + 66;
         int listWidth = 190;
         if (mouseX < x || mouseX >= x + listWidth
-                || mouseY < y || mouseY >= y + SHOP_HEIGHT * 5) {
+                || mouseY < y || mouseY >= y + SHOP_HEIGHT * SHOP_ROWS) {
             return false;
         }
         int index = scroll + (int) ((mouseY - y) / SHOP_HEIGHT);
         if (index < 0 || index >= shops.size()) return false;
         selectedShopIndex = index;
         return true;
+    }
+
+    @Override
+    public boolean mouseDragged(
+            double mouseX,
+            double mouseY,
+            int button,
+            double dragX,
+            double dragY
+    ) {
+        if (draggingScrollbar && button == 0) {
+            ScrollbarLayout scrollbar = scrollbarLayout();
+            if (scrollbar != null) updateScrollFromMouse(mouseY, scrollbar);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        boolean wasDragging = draggingScrollbar;
+        if (button == 0) draggingScrollbar = false;
+        return wasDragging || super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
@@ -199,11 +229,12 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     "screen.numismatics_treasury.history.empty");
             return;
         }
-        int end = Math.min(entries.size(), scroll + 5);
+        int end = Math.min(entries.size(), scroll + OVERVIEW_ROWS);
         for (int index = scroll; index < end; index++) {
             renderEntry(graphics, entries.get(index),
                     x, panelTop + 137 + (index - scroll) * ENTRY_HEIGHT);
         }
+        scrollbar(graphics);
     }
 
     private void renderHistory(GuiGraphics graphics) {
@@ -213,12 +244,12 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     "screen.numismatics_treasury.history.empty");
             return;
         }
-        int end = Math.min(entries.size(), scroll + 7);
+        int end = Math.min(entries.size(), scroll + HISTORY_ROWS);
         for (int index = scroll; index < end; index++) {
             renderEntry(graphics, entries.get(index),
                     x, panelTop + 66 + (index - scroll) * ENTRY_HEIGHT);
         }
-        scrollbar(graphics, entries.size(), 7, panelTop + 66, 7 * ENTRY_HEIGHT);
+        scrollbar(graphics);
     }
 
     private void renderEntry(GuiGraphics graphics, EntryView entry, int x, int y) {
@@ -265,7 +296,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             return;
         }
         int listWidth = 190;
-        int end = Math.min(shops.size(), scroll + 5);
+        int end = Math.min(shops.size(), scroll + SHOP_ROWS);
         for (int index = scroll; index < end; index++) {
             ShopView shop = shops.get(index);
             int y = panelTop + 66 + (index - scroll) * SHOP_HEIGHT;
@@ -292,7 +323,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                             "screen.numismatics_treasury.history.sales_short", shop.sales),
                     x + 30, y + 30, ACCENT, false);
         }
-        scrollbar(graphics, shops.size(), 5, panelTop + 66, 5 * SHOP_HEIGHT);
+        scrollbar(graphics);
         renderShopDetails(graphics, shops.get(Math.min(selectedShopIndex, shops.size() - 1)));
     }
 
@@ -422,14 +453,95 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                 panelLeft + panelWidth / 2, y, MUTED);
     }
 
-    private void scrollbar(GuiGraphics graphics, int total, int visible, int y, int height) {
-        if (total <= visible) return;
-        int x = panelLeft + panelWidth - 8;
-        graphics.fill(x, y, x + 3, y + height, SEPARATOR);
-        int thumb = Math.max(14, height * visible / total);
-        int travel = height - thumb;
-        int position = travel * scroll / Math.max(1, total - visible);
-        graphics.fill(x, y + position, x + 3, y + position + thumb, ACCENT);
+    private int maximumScroll() {
+        return switch (tab) {
+            case OVERVIEW -> Math.max(0, entries.size() - OVERVIEW_ROWS);
+            case HISTORY -> Math.max(0, entries.size() - HISTORY_ROWS);
+            case SHOPS -> Math.max(0, shops.size() - SHOP_ROWS);
+            case SERVER -> 0;
+        };
+    }
+
+    private ScrollbarLayout scrollbarLayout() {
+        return switch (tab) {
+            case OVERVIEW -> entries.isEmpty() ? null : new ScrollbarLayout(
+                    panelLeft + panelWidth - 7,
+                    panelTop + 137,
+                    OVERVIEW_ROWS * ENTRY_HEIGHT,
+                    entries.size(),
+                    OVERVIEW_ROWS
+            );
+            case HISTORY -> entries.isEmpty() ? null : new ScrollbarLayout(
+                    panelLeft + panelWidth - 7,
+                    panelTop + 66,
+                    HISTORY_ROWS * ENTRY_HEIGHT,
+                    entries.size(),
+                    HISTORY_ROWS
+            );
+            case SHOPS -> shops.isEmpty() ? null : new ScrollbarLayout(
+                    panelLeft + 203,
+                    panelTop + 66,
+                    SHOP_ROWS * SHOP_HEIGHT,
+                    shops.size(),
+                    SHOP_ROWS
+            );
+            case SERVER -> null;
+        };
+    }
+
+    private void scrollbar(GuiGraphics graphics) {
+        ScrollbarLayout layout = scrollbarLayout();
+        if (layout == null) return;
+        graphics.fill(
+                layout.x,
+                layout.y,
+                layout.x + 3,
+                layout.y + layout.height,
+                SEPARATOR
+        );
+        int thumb = layout.thumbHeight();
+        int travel = layout.height - thumb;
+        int position = maximumScroll() == 0
+                ? 0 : travel * scroll / maximumScroll();
+        graphics.fill(
+                layout.x,
+                layout.y + position,
+                layout.x + 3,
+                layout.y + position + thumb,
+                ACCENT
+        );
+    }
+
+    private void updateScrollFromMouse(double mouseY, ScrollbarLayout layout) {
+        int maximum = maximumScroll();
+        if (maximum == 0) {
+            scroll = 0;
+            return;
+        }
+        int thumb = layout.thumbHeight();
+        int travel = Math.max(1, layout.height - thumb);
+        double relative = (mouseY - layout.y - thumb / 2.0D) / travel;
+        scroll = Math.max(0, Math.min(maximum,
+                (int) Math.round(relative * maximum)));
+    }
+
+    private record ScrollbarLayout(
+            int x,
+            int y,
+            int height,
+            int total,
+            int visible
+    ) {
+        private int thumbHeight() {
+            return total <= visible
+                    ? height
+                    : Math.max(14, height * visible / total);
+        }
+
+        private boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x - 3 && mouseX < x + 6
+                    && mouseY >= y && mouseY < y + height;
+        }
     }
 
     private void leave() {
