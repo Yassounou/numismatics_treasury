@@ -28,6 +28,7 @@ public final class TreasuryButton extends Button {
     private final ResourceLocation icon;
     private final float iconScale;
     private final int iconYOffset;
+    private final boolean iconWithText;
     private boolean pressedByMouse;
     private long keyboardPressedUntil;
     private boolean awaitingConfirmation;
@@ -43,6 +44,7 @@ public final class TreasuryButton extends Button {
         icon = builder.icon;
         iconScale = builder.iconScale;
         iconYOffset = builder.iconYOffset;
+        iconWithText = builder.iconWithText;
         if (icon != null) setTooltip(Tooltip.create(getMessage()));
     }
 
@@ -82,10 +84,20 @@ public final class TreasuryButton extends Button {
         graphics.setColor(1.0F, 1.0F, 1.0F, alpha);
         RenderSystem.enableBlend();
         graphics.blitSprite(currentSprite(minecraft), getX(), getY(), getWidth(), getHeight());
+        int iconCenterX = getX() + getWidth() / 2;
+        int textX = 0;
+        if (icon != null && iconWithText) {
+            int iconWidth = Math.round(16.0F * iconScale);
+            int textWidth = minecraft.font.width(getMessage());
+            int contentWidth = iconWidth + 4 + textWidth;
+            int start = getX() + (getWidth() - contentWidth) / 2;
+            iconCenterX = start + iconWidth / 2;
+            textX = start + iconWidth + 4;
+        }
         if (icon != null) {
             graphics.pose().pushPose();
             graphics.pose().translate(
-                    getX() + getWidth() / 2.0F,
+                    iconCenterX,
                     getY() + getHeight() / 2.0F + iconYOffset,
                     0.0F
             );
@@ -104,9 +116,18 @@ public final class TreasuryButton extends Button {
             graphics.pose().popPose();
         }
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        int textColor = getFGColor() | (Mth.ceil(alpha * 255.0F) << 24);
         if (icon == null) {
-            int textColor = getFGColor() | (Mth.ceil(alpha * 255.0F) << 24);
             renderString(graphics, minecraft.font, textColor);
+        } else if (iconWithText) {
+            graphics.drawString(
+                    minecraft.font,
+                    getMessage(),
+                    textX,
+                    getY() + (getHeight() - minecraft.font.lineHeight) / 2,
+                    textColor,
+                    false
+            );
         }
     }
 
@@ -159,6 +180,7 @@ public final class TreasuryButton extends Button {
         private ResourceLocation icon;
         private float iconScale = 1.0F;
         private int iconYOffset;
+        private boolean iconWithText;
 
         private Builder(Component message, OnPress onPress) {
             super(message, ignored -> { });
@@ -173,6 +195,7 @@ public final class TreasuryButton extends Button {
             return this;
         }
         public Builder iconYOffset(int value) { iconYOffset = value; return this; }
+        public Builder iconWithText() { iconWithText = true; return this; }
         public Builder confirmation(Component message) {
             confirmationMessage = message;
             return this;

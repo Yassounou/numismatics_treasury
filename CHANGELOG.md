@@ -22,6 +22,8 @@
   item-component tooltips for history and shop statistics.
 - Reduced and raised the compact Player Shop action icons and replaced the
   settings glyph with its dedicated sprite.
+- Added reduced icons beside the History & Statistics tab labels and made all
+  history pages adapt their visible rows and spacing to GUI scale 4.
 - Player Shop stock withdrawal now opens a dedicated quantity selector with a
   safe maximum based on the shop stock and available inventory space.
 - Unowned Player Shops placed by a Schematicannon can now be claimed with a

@@ -32,10 +32,6 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             .withZone(ZoneId.systemDefault());
     private static final int ENTRY_HEIGHT = 31;
     private static final int SHOP_HEIGHT = 43;
-    private static final int OVERVIEW_ROWS = 5;
-    private static final int HISTORY_ROWS = 7;
-    private static final int SHOP_ROWS = 5;
-    private static final int BENEFICIARY_ROWS = 4;
     private static final ResourceLocation SETTINGS_ICON = ResourceLocation.fromNamespaceAndPath(
             NumismaticsTreasury.MOD_ID,
             "textures/gui/icons/history_settings.png"
@@ -114,6 +110,10 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             addRenderableWidget(TreasuryButton.builder(
                             Component.translatable(value.key),
                             ignored -> switchTab(value))
+                    .icon(value.icon)
+                    .iconScale(0.75F)
+                    .iconYOffset(-1)
+                    .iconWithText()
                     .selected(tab == value)
                     .bounds(x + index * (width + gap), y, width, 20)
                     .build());
@@ -294,7 +294,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int y = panelTop + 90;
         int listWidth = 190;
         if (mouseX < x || mouseX >= x + listWidth
-                || mouseY < y || mouseY >= y + SHOP_HEIGHT * SHOP_ROWS) {
+                || mouseY < y || mouseY >= y + SHOP_HEIGHT * shopRows()) {
             return false;
         }
         int index = scroll + (int) ((mouseY - y) / SHOP_HEIGHT);
@@ -352,6 +352,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     balance
             );
         }
+        scroll = Math.max(0, Math.min(scroll, maximumScroll()));
         switch (tab) {
             case OVERVIEW -> renderOverview(graphics);
             case HISTORY -> renderHistory(graphics);
@@ -399,7 +400,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     "screen.numismatics_treasury.history.empty");
             return;
         }
-        int end = Math.min(entries.size(), scroll + OVERVIEW_ROWS);
+        int end = Math.min(entries.size(), scroll + overviewRows());
         for (int index = scroll; index < end; index++) {
             renderEntry(graphics, entries.get(index),
                     x, panelTop + 137 + (index - scroll) * ENTRY_HEIGHT);
@@ -414,7 +415,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     "screen.numismatics_treasury.history.empty");
             return;
         }
-        int end = Math.min(entries.size(), scroll + HISTORY_ROWS);
+        int end = Math.min(entries.size(), scroll + historyRows());
         for (int index = scroll; index < end; index++) {
             renderEntry(graphics, entries.get(index),
                     x, panelTop + 66 + (index - scroll) * ENTRY_HEIGHT);
@@ -470,7 +471,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             return;
         }
         int listWidth = 190;
-        int end = Math.min(shops.size(), scroll + SHOP_ROWS);
+        int end = Math.min(shops.size(), scroll + shopRows());
         for (int index = scroll; index < end; index++) {
             ShopView shop = shops.get(index);
             int y = panelTop + 90 + (index - scroll) * SHOP_HEIGHT;
@@ -509,6 +510,14 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int x = panelLeft + 210;
         int y = panelTop + 90;
         int width = panelWidth - 220;
+        boolean compact = compactShopDetails();
+        int totalsOffset = compact ? 32 : 42;
+        int bestSaleOffset = compact ? 45 : 57;
+        int separatorOffset = compact ? 58 : 75;
+        int periodOffset = compact ? 65 : 84;
+        int periodStep = compact ? 14 : 17;
+        int beneficiaryTitleOffset = compact ? 111 : 143;
+        int beneficiaryStartOffset = beneficiaryStartOffset();
         graphics.fill(x, y, x + width, panelTop + panelHeight - 10, PANEL_ALT);
         ItemStack icon = shop.item.isEmpty()
                 ? item(shop.itemId) : shop.item.copy();
@@ -526,31 +535,32 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                 shop.sales, shop.itemsSold, number(shop.grossRevenue)).getString();
         graphics.drawString(font,
                 font.plainSubstrByWidth(totalsText, width - 18),
-                x + 9, y + 42, ACCENT, false);
+                x + 9, y + totalsOffset, ACCENT, false);
         graphics.drawString(font, Component.translatable(
                         "screen.numismatics_treasury.history.best_sale",
                         number(shop.bestSale)),
-                x + 9, y + 57, TEXT, false);
+                x + 9, y + bestSaleOffset, TEXT, false);
 
-        graphics.fill(x + 8, y + 75, x + width - 8, y + 76, SEPARATOR);
-        periodLine(graphics, x + 9, y + 84, "24 h", shop.day);
-        periodLine(graphics, x + 9, y + 101, "7 d", shop.week);
-        periodLine(graphics, x + 9, y + 118, "30 d", shop.month);
+        graphics.fill(x + 8, y + separatorOffset,
+                x + width - 8, y + separatorOffset + 1, SEPARATOR);
+        periodLine(graphics, x + 9, y + periodOffset, "24 h", shop.day);
+        periodLine(graphics, x + 9, y + periodOffset + periodStep, "7 d", shop.week);
+        periodLine(graphics, x + 9, y + periodOffset + periodStep * 2, "30 d", shop.month);
 
         graphics.drawString(font, Component.translatable(
                         "screen.numismatics_treasury.history.beneficiaries"),
-                x + 9, y + 143, ACCENT, false);
+                x + 9, y + beneficiaryTitleOffset, ACCENT, false);
         if (shop.beneficiaries.isEmpty()) {
             graphics.drawString(font, Component.translatable(
                             "screen.numismatics_treasury.history.no_revenue"),
-                    x + 9, y + 160, MUTED, false);
+                    x + 9, y + beneficiaryStartOffset, MUTED, false);
             return;
         }
         int maximum = maximumBeneficiaryScroll();
         beneficiaryScroll = Math.max(0, Math.min(beneficiaryScroll, maximum));
         int end = Math.min(
                 shop.beneficiaries.size(),
-                beneficiaryScroll + BENEFICIARY_ROWS
+                beneficiaryScroll + beneficiaryRows()
         );
         for (int index = beneficiaryScroll; index < end; index++) {
             BeneficiaryView beneficiary = shop.beneficiaries.get(index);
@@ -558,10 +568,10 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             String amount = number(beneficiary.revenue) + " spurs";
             graphics.drawString(font,
                     font.plainSubstrByWidth(beneficiary.name, width - 100),
-                    x + 9, y + 160 + row * 14, TEXT, false);
+                    x + 9, y + beneficiaryStartOffset + row * 14, TEXT, false);
             graphics.drawString(font, amount,
                     x + width - 9 - font.width(amount),
-                    y + 160 + row * 14, SUCCESS, false);
+                    y + beneficiaryStartOffset + row * 14, SUCCESS, false);
         }
         beneficiaryScrollbar(graphics);
     }
@@ -584,23 +594,26 @@ public final class HistoryStatsScreen extends TreasuryScreen {
 
     private void renderServer(GuiGraphics graphics) {
         if (server == null) return;
+        boolean compact = panelHeight < 290;
         int x = panelLeft + 18;
-        int y = panelTop + 74;
+        int y = panelTop + (compact ? 66 : 74);
         int width = (panelWidth - 42) / 2;
-        int height = 48;
+        int height = compact ? 38 : 48;
+        int step = compact ? 44 : 56;
         serverCard(graphics, x, y, width, height,
                 "screen.numismatics_treasury.history.server.volume", server.totalVolume);
         serverCard(graphics, x + width + 6, y, width, height,
                 "screen.numismatics_treasury.history.server.transactions", server.transactions);
-        serverCard(graphics, x, y + 56, width, height,
+        serverCard(graphics, x, y + step, width, height,
                 "screen.numismatics_treasury.history.server.transfers", server.transferVolume);
-        serverCard(graphics, x + width + 6, y + 56, width, height,
+        serverCard(graphics, x + width + 6, y + step, width, height,
                 "screen.numismatics_treasury.history.server.player_shops", server.playerShopVolume);
-        serverCard(graphics, x, y + 112, width, height,
+        serverCard(graphics, x, y + step * 2, width, height,
                 "screen.numismatics_treasury.history.server.server_shops", server.serverShopVolume);
-        serverCard(graphics, x + width + 6, y + 112, width, height,
+        serverCard(graphics, x + width + 6, y + step * 2, width, height,
                 "screen.numismatics_treasury.history.server.auctions", server.auctionVolume);
-        serverCard(graphics, x, y + 168, panelWidth - 36, 38,
+        serverCard(graphics, x, y + step * 3, panelWidth - 36,
+                compact ? 36 : 38,
                 "screen.numismatics_treasury.history.server.commissions",
                 server.commissionCollected);
     }
@@ -638,11 +651,40 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                 panelLeft + panelWidth / 2, y, MUTED);
     }
 
+    private int overviewRows() {
+        return Math.max(1, Math.min(5,
+                (panelHeight - 157) / ENTRY_HEIGHT));
+    }
+
+    private int historyRows() {
+        return Math.max(1, Math.min(7,
+                (panelHeight - 76) / ENTRY_HEIGHT));
+    }
+
+    private int shopRows() {
+        return Math.max(1, Math.min(5,
+                (panelHeight - 100) / SHOP_HEIGHT));
+    }
+
+    private boolean compactShopDetails() {
+        return panelHeight < 290;
+    }
+
+    private int beneficiaryStartOffset() {
+        return compactShopDetails() ? 126 : 160;
+    }
+
+    private int beneficiaryRows() {
+        int available = panelHeight - 10
+                - (90 + beneficiaryStartOffset());
+        return Math.max(1, Math.min(4, available / 14));
+    }
+
     private int maximumScroll() {
         return switch (tab) {
-            case OVERVIEW -> Math.max(0, entries.size() - OVERVIEW_ROWS);
-            case HISTORY -> Math.max(0, entries.size() - HISTORY_ROWS);
-            case SHOPS -> Math.max(0, shops.size() - SHOP_ROWS);
+            case OVERVIEW -> Math.max(0, entries.size() - overviewRows());
+            case HISTORY -> Math.max(0, entries.size() - historyRows());
+            case SHOPS -> Math.max(0, shops.size() - shopRows());
             case SERVER -> 0;
         };
     }
@@ -652,23 +694,23 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             case OVERVIEW -> entries.isEmpty() ? null : new ScrollbarLayout(
                     panelLeft + panelWidth - 7,
                     panelTop + 137,
-                    OVERVIEW_ROWS * ENTRY_HEIGHT,
+                    overviewRows() * ENTRY_HEIGHT,
                     entries.size(),
-                    OVERVIEW_ROWS
+                    overviewRows()
             );
             case HISTORY -> entries.isEmpty() ? null : new ScrollbarLayout(
                     panelLeft + panelWidth - 7,
                     panelTop + 66,
-                    HISTORY_ROWS * ENTRY_HEIGHT,
+                    historyRows() * ENTRY_HEIGHT,
                     entries.size(),
-                    HISTORY_ROWS
+                    historyRows()
             );
             case SHOPS -> shops.isEmpty() ? null : new ScrollbarLayout(
                     panelLeft + 203,
                     panelTop + 90,
-                    SHOP_ROWS * SHOP_HEIGHT,
+                    shopRows() * SHOP_HEIGHT,
                     shops.size(),
-                    SHOP_ROWS
+                    shopRows()
             );
             case SERVER -> null;
         };
@@ -713,7 +755,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private int maximumBeneficiaryScroll() {
         if (tab != Tab.SHOPS || shops.isEmpty()) return 0;
         ShopView shop = shops.get(Math.min(selectedShopIndex, shops.size() - 1));
-        return Math.max(0, shop.beneficiaries.size() - BENEFICIARY_ROWS);
+        return Math.max(0, shop.beneficiaries.size() - beneficiaryRows());
     }
 
     private ScrollbarLayout beneficiaryScrollbarLayout() {
@@ -722,10 +764,10 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         if (shop.beneficiaries.isEmpty()) return null;
         return new ScrollbarLayout(
                 panelLeft + panelWidth - 17,
-                panelTop + 250,
-                BENEFICIARY_ROWS * 14,
+                panelTop + 90 + beneficiaryStartOffset(),
+                beneficiaryRows() * 14,
                 shop.beneficiaries.size(),
-                BENEFICIARY_ROWS
+                beneficiaryRows()
         );
     }
 
@@ -839,15 +881,28 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     }
 
     private enum Tab {
-        OVERVIEW("screen.numismatics_treasury.history.tab.overview"),
-        HISTORY("screen.numismatics_treasury.history.tab.history"),
-        SHOPS("screen.numismatics_treasury.history.tab.shops"),
-        SERVER("screen.numismatics_treasury.history.tab.server");
+        OVERVIEW(
+                "screen.numismatics_treasury.history.tab.overview",
+                "history_overview"),
+        HISTORY(
+                "screen.numismatics_treasury.history.tab.history",
+                "history_transactions"),
+        SHOPS(
+                "screen.numismatics_treasury.history.tab.shops",
+                "history_player_shops"),
+        SERVER(
+                "screen.numismatics_treasury.history.tab.server",
+                "history_server");
 
         private final String key;
+        private final ResourceLocation icon;
 
-        Tab(String key) {
+        Tab(String key, String iconName) {
             this.key = key;
+            icon = ResourceLocation.fromNamespaceAndPath(
+                    NumismaticsTreasury.MOD_ID,
+                    "textures/gui/icons/" + iconName + ".png"
+            );
         }
     }
 
