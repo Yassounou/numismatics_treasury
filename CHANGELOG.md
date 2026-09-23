@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0-history-test — 2026-09-23
+## 1.3.0 — 2026-09-23
 
 - Added a personal History & Statistics interface matching the existing
   Numismatics Treasury visual direction.
