@@ -10,6 +10,8 @@ import dev.yassou.numismaticstreasury.network.payload.TreasuryActionPayload;
 import dev.yassou.numismaticstreasury.server.BankService;
 import dev.yassou.numismaticstreasury.server.auction.AuctionListing;
 import dev.yassou.numismaticstreasury.server.auction.TreasuryData;
+import dev.yassou.numismaticstreasury.server.history.HistoryData;
+import dev.yassou.numismaticstreasury.server.history.HistoryService;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.BlockPos;
@@ -19,10 +21,14 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class TreasuryNetwork {
     public static final Gson GSON = new Gson();
-    private static final String PROTOCOL_VERSION = "4";
+    private static final String PROTOCOL_VERSION = "5";
 
     private TreasuryNetwork() {
     }
@@ -114,6 +120,122 @@ public final class TreasuryNetwork {
         }
         data.add("associates", associates);
         open(player, "player_shop_associates", data);
+    }
+
+    public static void openHistoryStats(
+            ServerPlayer player,
+            String source,
+            boolean portable,
+            @Nullable BlockPos returnPos,
+            @Nullable ServerShopBlockEntity contextShop
+    ) {
+        HistoryData saved = HistoryData.get(player.getServer());
+        if (contextShop != null) HistoryService.ensureShop(contextShop);
+
+        JsonObject data = new JsonObject();
+        data.addProperty("source", source);
+        data.addProperty("portable", portable);
+        if (returnPos != null) data.addProperty("returnPos", returnPos.asLong());
+        data.addProperty("balance", BankService.balance(player));
+        data.addProperty("operator", player.hasPermissions(2));
+        if (contextShop != null) {
+            data.addProperty("selectedShop", HistoryService.shopKey(contextShop));
+        }
+
+        HistoryData.PlayerTotals totals = saved.totals(player.getUUID());
+        JsonObject playerTotals = new JsonObject();
+        playerTotals.addProperty("earned", totals.earned());
+        playerTotals.addProperty("spent", totals.spent());
+        playerTotals.addProperty("sent", totals.sent());
+        playerTotals.addProperty("received", totals.received());
+        playerTotals.addProperty("shopEarned", totals.shopEarned());
+        playerTotals.addProperty("shopSpent", totals.shopSpent());
+        playerTotals.addProperty("auctionEarned", totals.auctionEarned());
+        playerTotals.addProperty("auctionSpent", totals.auctionSpent());
+        playerTotals.addProperty("transactions", totals.transactions());
+        data.add("totals", playerTotals);
+
+        JsonArray entries = new JsonArray();
+        saved.entries(player.getUUID()).stream().limit(200).forEach(entry -> {
+            JsonObject value = new JsonObject();
+            value.addProperty("timestamp", entry.timestamp());
+            value.addProperty("type", entry.type().name());
+            value.addProperty("amount", entry.amount());
+            value.addProperty("quantity", entry.quantity());
+            value.addProperty("itemId", entry.itemId());
+            value.addProperty("itemName", entry.itemName());
+            value.addProperty("counterparty", entry.counterparty());
+            value.addProperty("detail", entry.detail());
+            entries.add(value);
+        });
+        data.add("entries", entries);
+
+        Map<String, HistoryData.ShopStats> visibleShops = new LinkedHashMap<>();
+        saved.shopsFor(player.getUUID()).forEach(shop -> visibleShops.put(shop.key(), shop));
+        if (contextShop != null) {
+            HistoryData.ShopStats selected = saved.shop(HistoryService.shopKey(contextShop));
+            if (selected != null) visibleShops.put(selected.key(), selected);
+        }
+        JsonArray shops = new JsonArray();
+        visibleShops.values().forEach(shop -> shops.add(shopStats(shop)));
+        data.add("shops", shops);
+
+        if (player.hasPermissions(2)
+                && TreasuryConfig.get().history.operatorGlobalStatistics) {
+            HistoryData.GlobalStats global = saved.global();
+            JsonObject server = new JsonObject();
+            server.addProperty("transactions", global.transactions());
+            server.addProperty("totalVolume", global.totalVolume());
+            server.addProperty("transferVolume", global.transferVolume());
+            server.addProperty("serverShopVolume", global.serverShopVolume());
+            server.addProperty("playerShopVolume", global.playerShopVolume());
+            server.addProperty("auctionVolume", global.auctionVolume());
+            server.addProperty("commissionCollected", global.commissionCollected());
+            data.add("server", server);
+        }
+        open(player, "history_stats", data);
+    }
+
+    private static JsonObject shopStats(HistoryData.ShopStats shop) {
+        long now = System.currentTimeMillis();
+        JsonObject value = new JsonObject();
+        value.addProperty("key", shop.key());
+        value.addProperty("ownerName", shop.ownerName());
+        value.addProperty("dimension", shop.dimension());
+        value.addProperty("pos", shop.pos());
+        value.addProperty("itemId", shop.itemId());
+        value.addProperty("itemName", shop.itemName());
+        value.addProperty("startedAt", shop.startedAt());
+        value.addProperty("sales", shop.sales());
+        value.addProperty("itemsSold", shop.itemsSold());
+        value.addProperty("grossRevenue", shop.grossRevenue());
+        value.addProperty("bestSale", shop.bestSale());
+        value.addProperty("lastSaleAt", shop.lastSaleAt());
+        addPeriod(value, "day", shop.period(now - 86_400_000L));
+        addPeriod(value, "week", shop.period(now - 7L * 86_400_000L));
+        addPeriod(value, "month", shop.period(now - 30L * 86_400_000L));
+        JsonArray beneficiaries = new JsonArray();
+        shop.beneficiaries().forEach((uuid, beneficiary) -> {
+            JsonObject saved = new JsonObject();
+            saved.addProperty("uuid", uuid.toString());
+            saved.addProperty("name", beneficiary.name());
+            saved.addProperty("revenue", beneficiary.revenue());
+            beneficiaries.add(saved);
+        });
+        value.add("beneficiaries", beneficiaries);
+        return value;
+    }
+
+    private static void addPeriod(
+            JsonObject value,
+            String name,
+            HistoryData.PeriodStats period
+    ) {
+        JsonObject saved = new JsonObject();
+        saved.addProperty("sales", period.sales());
+        saved.addProperty("items", period.items());
+        saved.addProperty("revenue", period.revenue());
+        value.add(name, saved);
     }
 
     private static JsonObject playerShopData(

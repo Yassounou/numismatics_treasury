@@ -4,6 +4,8 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.yassou.numismaticstreasury.config.TreasuryConfig;
+import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
+import dev.yassou.numismaticstreasury.server.history.HistoryService;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
@@ -42,8 +44,21 @@ public final class TreasuryCommands {
         );
         event.getDispatcher().register(
                 Commands.literal("numismatics_treasury")
-                        .requires(source -> source.hasPermission(2))
-                        .then(Commands.literal("reload").executes(context -> {
+                        .then(Commands.literal("history").executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            if (!TreasuryConfig.get().history.enabled) {
+                                player.sendSystemMessage(Component.translatable(
+                                        "message.numismatics_treasury.history.disabled"
+                                ).withStyle(ChatFormatting.RED));
+                                return 0;
+                            }
+                            TreasuryNetwork.openHistoryStats(
+                                    player, "command", false, null, null);
+                            return 1;
+                        }))
+                        .then(Commands.literal("reload")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(context -> {
                             TreasuryConfig.ReloadResult result = TreasuryConfig.load();
                             if (result.successful()) {
                                 context.getSource().getServer().reloadResources(
@@ -108,6 +123,14 @@ public final class TreasuryCommands {
                         amount
                 ).withStyle(ChatFormatting.GREEN));
             }
+            HistoryService.recordTransfer(
+                    sender.getServer(),
+                    sender.getUUID(),
+                    sender.getGameProfile().getName(),
+                    target.get().getId(),
+                    target.get().getName(),
+                    amount
+            );
             return 1;
         }
         return 0;

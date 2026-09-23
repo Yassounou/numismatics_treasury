@@ -12,6 +12,8 @@ import dev.yassou.numismaticstreasury.server.ProfileResolver;
 import dev.yassou.numismaticstreasury.server.auction.AuctionService;
 import dev.yassou.numismaticstreasury.server.auction.ListingType;
 import dev.yassou.numismaticstreasury.server.auction.TreasuryData;
+import dev.yassou.numismaticstreasury.server.history.HistoryData;
+import dev.yassou.numismaticstreasury.server.history.HistoryService;
 import dev.yassou.numismaticstreasury.registry.TreasuryContent;
 import dev.yassou.numismaticstreasury.menu.PlayerShopMenu;
 import net.minecraft.core.BlockPos;
@@ -22,7 +24,9 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,6 +60,9 @@ public final class ServerActionHandler {
                 case "player_shop_associate_save" -> savePlayerShopAssociate(player, data);
                 case "player_shop_associate_remove" -> removePlayerShopAssociate(player, data);
                 case "player_shop_associate_back" -> backToPlayerShop(player, data);
+                case "history_open" -> openHistory(player, data);
+                case "player_shop_open_stats" -> openPlayerShopStats(player, data);
+                case "history_back" -> closeHistory(player, data);
                 case "auction_create" -> auctionCreate(player, data);
                 case "auction_buy" -> auctionBuy(player, data);
                 case "auction_bid" -> auctionBid(player, data);
@@ -121,6 +128,16 @@ public final class ServerActionHandler {
                         player.getGameProfile().getName(),
                         amount
                 ));
+            }
+            if (transfer.successful()) {
+                HistoryService.recordTransfer(
+                        player.getServer(),
+                        player.getUUID(),
+                        player.getGameProfile().getName(),
+                        target.get().getId(),
+                        target.get().getName(),
+                        amount
+                );
             }
         }
         reopenBankTeller(player, portable, terminal);
@@ -242,6 +259,7 @@ public final class ServerActionHandler {
             } else {
                 InventoryUtil.give(player, template, quantity);
                 message(player, true, "message.numismatics_treasury.shop.purchase", total);
+                HistoryService.recordServerShop(player, template, quantity, total, true);
             }
         } else if (InventoryUtil.countMatching(player, template) < quantity) {
             message(player, false, "message.numismatics_treasury.shop.not_enough_items");
@@ -249,6 +267,7 @@ public final class ServerActionHandler {
             InventoryUtil.removeMatching(player, template, quantity);
             BankService.credit(player, total);
             message(player, true, "message.numismatics_treasury.shop.sale", total);
+            HistoryService.recordServerShop(player, template, quantity, total, false);
         }
         TreasuryNetwork.openShop(player, shop);
     }
@@ -488,6 +507,70 @@ public final class ServerActionHandler {
         if (shop != null) player.openMenu(shop);
     }
 
+    private static void openHistory(ServerPlayer player, JsonObject data) {
+        if (!TreasuryConfig.get().history.enabled) {
+            message(player, false, "message.numismatics_treasury.history.disabled");
+            return;
+        }
+        String source = data.has("source") ? data.get("source").getAsString() : "command";
+        boolean portable = data.has("portable") && data.get("portable").getAsBoolean();
+        BlockPos returnPos = data.has("pos")
+                ? BlockPos.of(data.get("pos").getAsLong()) : null;
+        TreasuryNetwork.openHistoryStats(
+                player,
+                source,
+                portable,
+                returnPos,
+                null
+        );
+    }
+
+    private static void openPlayerShopStats(ServerPlayer player, JsonObject data) {
+        if (!TreasuryConfig.get().history.enabled) {
+            message(player, false, "message.numismatics_treasury.history.disabled");
+            return;
+        }
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop == null) return;
+        if (!(player.containerMenu instanceof PlayerShopMenu menu)
+                || !menu.matches(shop)) {
+            message(player, false, "message.numismatics_treasury.player_shop.menu_invalid");
+            return;
+        }
+        player.closeContainer();
+        TreasuryNetwork.openHistoryStats(
+                player,
+                "player_shop",
+                false,
+                shop.getBlockPos(),
+                shop
+        );
+    }
+
+    private static void closeHistory(ServerPlayer player, JsonObject data) {
+        String source = data.has("source") ? data.get("source").getAsString() : "command";
+        if (source.equals("bank")) {
+            boolean portable = data.has("portable") && data.get("portable").getAsBoolean();
+            if (portable && holdsPortableTerminal(player)) {
+                TreasuryNetwork.openPortableBankTeller(player);
+            } else if (!portable && data.has("returnPos")) {
+                BlockPos pos = BlockPos.of(data.get("returnPos").getAsLong());
+                if (near(player, pos)
+                        && player.level().getBlockState(pos)
+                        .is(TreasuryContent.BANK_TELLER.get())) {
+                    TreasuryNetwork.openBankTeller(player, pos);
+                }
+            }
+            return;
+        }
+        if (source.equals("player_shop") && data.has("returnPos")) {
+            JsonObject shopData = new JsonObject();
+            shopData.addProperty("pos", data.get("returnPos").getAsLong());
+            ServerShopBlockEntity shop = playerShop(player, shopData, true);
+            if (shop != null) player.openMenu(shop);
+        }
+    }
+
     private static ServerShopBlockEntity editablePlayerShop(
             ServerPlayer player,
             JsonObject data
@@ -634,6 +717,19 @@ public final class ServerActionHandler {
                             share.amount()
                     );
                 }
+                Map<UUID, HistoryData.BeneficiaryShare> distribution =
+                        new LinkedHashMap<>();
+                distribution.put(ownerUuid, new HistoryData.BeneficiaryShare(
+                        shop.ownerName(), ownerShare));
+                for (ServerShopBlockEntity.LinkedPlayer linked : shop.linkedPlayers()) {
+                    distribution.put(linked.uuid(),
+                            new HistoryData.BeneficiaryShare(
+                                    linked.name(),
+                                    shop.linkedPlayerShare(linked, total)
+                            ));
+                }
+                HistoryService.recordPlayerShopSale(
+                        player, shop, template, quantity, total, distribution);
             }
         }
         TreasuryNetwork.openPlayerShop(player, shop);

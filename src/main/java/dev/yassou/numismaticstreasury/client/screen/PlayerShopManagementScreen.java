@@ -93,7 +93,12 @@ public final class PlayerShopManagementScreen
                         Component.translatable(
                                 "screen.numismatics_treasury.player_shop.associates"),
                         ignored -> openAssociates())
-                .bounds(leftPos + 8, topPos + 129, 160, 20)
+                .bounds(leftPos + 8, topPos + 129, 78, 20)
+                .build());
+        addRenderableWidget(TreasuryButton.builder(
+                        Component.translatable("screen.numismatics_treasury.history.stats"),
+                        ignored -> openStats())
+                .bounds(leftPos + 90, topPos + 129, 78, 20)
                 .build());
         updateButtons();
     }
@@ -153,6 +158,12 @@ public final class PlayerShopManagementScreen
         JsonObject data = new JsonObject();
         data.addProperty("pos", menu.blockPos().asLong());
         TreasuryNetwork.sendAction("player_shop_open_associates", data);
+    }
+
+    private void openStats() {
+        JsonObject data = new JsonObject();
+        data.addProperty("pos", menu.blockPos().asLong());
+        TreasuryNetwork.sendAction("player_shop_open_stats", data);
     }
 
     @Override

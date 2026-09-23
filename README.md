@@ -1,4 +1,4 @@
-# Numismatics Treasury 1.2.0
+# Numismatics Treasury
 
 Numismatics Treasury is a NeoForge 1.21.1 addon for Numismatics. It expands
 the banking system with direct transfers, configurable shops, player-owned
@@ -27,6 +27,12 @@ The mod includes English text and a complete French translation.
   not match the configured filter.
 - The global Auction House supports direct sales, timed auctions, held bids,
   configurable commissions, search, notifications, and safe item claims.
+- A personal History & Statistics screen records transfers, purchases, sales,
+  bids, refunds, and Player Shop revenue without changing existing shop data.
+- Player Shop statistics include lifetime totals, 24-hour, 7-day and 30-day
+  activity, best sale, and the revenue received by each beneficiary.
+- Operators can view concise server-wide transaction volumes and Auction House
+  commissions from the same interface.
 - The custom interfaces use the visual direction of Numismatics and include
   full item tooltips, enchantments, custom lore, and modded components.
 
@@ -65,6 +71,8 @@ each associate.
 - Right-click any Auction House block to open the server-wide marketplace.
 - Right-click a Transfer Teller, or use a Portable Transfer Terminal, to enter
   a recipient and an amount. Press Tab to complete known player names.
+- Open History & Statistics from the Transfer Teller, from a Player Shop's
+  management screen, or with `/numismatics_treasury history`.
 
 ## Server Configuration
 
@@ -84,7 +92,13 @@ It can independently enable or disable:
 - Auction House
 
 It also controls payment limits, Auction House commissions, listing limits,
-price limits, and allowed listing durations.
+price limits, allowed listing durations, and History & Statistics retention.
+
+The `history` section can enable or disable the feature, select which modules
+are recorded, limit retained personal and shop entries, set the retention
+period, and control access to operator-only global statistics. History is
+stored separately from shops and starts recording from the moment this version
+is installed; earlier transactions are not reconstructed.
 
 Reload the configuration without restarting the server:
 
@@ -109,8 +123,8 @@ Numismatics is the only declared mod dependency.
 
 ## Installation
 
-Place `numismatics_treasury-1.2.0.jar` in the `mods` directory on both the
-server and clients, alongside Numismatics.
+Place the Numismatics Treasury JAR in the `mods` directory on both the server
+and clients, alongside Numismatics.
 
 ## Building
 

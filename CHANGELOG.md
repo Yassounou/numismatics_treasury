@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0-history-test — 2026-09-23
+
+- Added a personal History & Statistics interface matching the existing
+  Numismatics Treasury visual direction.
+- Added transaction history for transfers, Server Shops, Player Shops, and the
+  Auction House.
+- Added Player Shop lifetime totals, recent periods, best sale, and revenue
+  distribution between the owner and associates.
+- Added operator-only server-wide transaction volumes and Auction House
+  commission totals.
+- Added configurable retention, entry limits, recorded modules, and operator
+  statistics access.
+- Kept all statistics in separate world data. Existing shops remain unchanged
+  and begin collecting statistics from zero after installing this test build.
+
 ## 1.2.0 — 2026-09-19
 
 - Un shop joueur peut maintenant avoir jusqu'à 16 associés.

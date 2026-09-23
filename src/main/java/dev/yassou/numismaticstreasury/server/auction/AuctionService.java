@@ -5,6 +5,7 @@ import dev.yassou.numismaticstreasury.config.TreasuryConfig;
 import dev.yassou.numismaticstreasury.server.BankService;
 import dev.yassou.numismaticstreasury.server.InventoryUtil;
 import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
+import dev.yassou.numismaticstreasury.server.history.HistoryService;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -76,6 +77,12 @@ public final class AuctionService {
         seller.getInventory().items.set(inventorySlot, ItemStack.EMPTY);
         seller.getInventory().setChanged();
         data.put(listing);
+        HistoryService.recordAuctionListed(
+                seller,
+                listing.item(),
+                listing.price(),
+                listing.type().name()
+        );
         return Result.success("message.numismatics_treasury.auction.created");
     }
 
@@ -122,6 +129,16 @@ public final class AuctionService {
                 "notification.numismatics_treasury.auction.item_sold",
                 buyer.getGameProfile().getName(),
                 listing.item().getHoverName().getString(),
+                sellerAmount
+        );
+        HistoryService.recordAuctionPurchase(
+                buyer.getServer(),
+                buyer.getUUID(),
+                buyer.getGameProfile().getName(),
+                listing.sellerUuid(),
+                listing.sellerName(),
+                listing.item(),
+                listing.price(),
                 sellerAmount
         );
         if (undelivered.isEmpty()) {
@@ -189,8 +206,21 @@ public final class AuctionService {
                 amount
         );
         data.changed();
+        HistoryService.recordAuctionBid(
+                bidder,
+                listing.item(),
+                amount,
+                listing.sellerName()
+        );
         if (!sameBidder && previousBidder != null) {
             BankService.credit(previousBidder, previousAmount);
+            HistoryService.recordAuctionRefund(
+                    bidder.getServer(),
+                    previousBidder,
+                    listing.item(),
+                    previousAmount,
+                    "outbid"
+            );
             notifyPlayer(
                     bidder.getServer(),
                     previousBidder,
@@ -226,6 +256,13 @@ public final class AuctionService {
         data.addClaim(listing.sellerUuid(), listing.item());
         if (listing.leadingBidderUuid() != null) {
             BankService.credit(listing.leadingBidderUuid(), listing.currentBid());
+            HistoryService.recordAuctionRefund(
+                    actor.getServer(),
+                    listing.leadingBidderUuid(),
+                    listing.item(),
+                    listing.currentBid(),
+                    "cancelled"
+            );
         }
         if (!owner) {
             notifyPlayer(
@@ -306,6 +343,16 @@ public final class AuctionService {
                     "notification.numismatics_treasury.auction.won",
                     listing.item().getHoverName().getString()
             );
+            HistoryService.recordAuctionWon(
+                    server,
+                    listing.leadingBidderUuid(),
+                    listing.leadingBidderName(),
+                    listing.sellerUuid(),
+                    listing.sellerName(),
+                    listing.item(),
+                    listing.currentBid(),
+                    sellerAmount
+            );
         } else {
             data.addClaim(listing.sellerUuid(), listing.item());
             notifyPlayer(
@@ -313,6 +360,11 @@ public final class AuctionService {
                     listing.sellerUuid(),
                     "notification.numismatics_treasury.auction.expired",
                     listing.item().getHoverName().getString()
+            );
+            HistoryService.recordAuctionExpired(
+                    server,
+                    listing.sellerUuid(),
+                    listing.item()
             );
         }
     }

@@ -5,6 +5,7 @@ import dev.yassou.numismaticstreasury.block.entity.ServerShopBlockEntity;
 import dev.yassou.numismaticstreasury.config.TreasuryConfig;
 import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
 import dev.yassou.numismaticstreasury.server.BankService;
+import dev.yassou.numismaticstreasury.server.history.HistoryService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -88,6 +89,8 @@ public final class PlayerShopBlock extends BaseEntityBlock {
             if (!event.getLevel().isClientSide()) {
                 player.sendSystemMessage(Component.translatable(message));
             }
+        } else if (!event.getLevel().isClientSide()) {
+            HistoryService.removeShop(shop);
         }
     }
 

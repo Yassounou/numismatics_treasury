@@ -81,12 +81,17 @@ public final class BankTellerScreen extends TreasuryScreen {
                 ).green()
                 .confirmation(Component.translatable(
                         "screen.numismatics_treasury.transfer_teller.confirm"))
-                .bounds(x, panelTop + 155, width - 78, 20)
+                .bounds(x, panelTop + 155, 156, 20)
+                .build());
+        addRenderableWidget(TreasuryButton.builder(
+                        Component.translatable("screen.numismatics_treasury.history.short"),
+                        ignored -> openHistory()
+                ).bounds(x + 160, panelTop + 155, 82, 20)
                 .build());
         addRenderableWidget(TreasuryButton.builder(
                         Component.translatable("screen.numismatics_treasury.close"),
                         ignored -> onClose()
-                ).bounds(x + width - 70, panelTop + 155, 70, 20)
+                ).bounds(x + 246, panelTop + 155, 56, 20)
                 .build());
         updateSendState();
     }
@@ -163,6 +168,14 @@ public final class BankTellerScreen extends TreasuryScreen {
         data.addProperty("portable", portable);
         if (!portable) data.addProperty("pos", pos);
         TreasuryNetwork.sendAction("pay", data);
+    }
+
+    private void openHistory() {
+        JsonObject data = new JsonObject();
+        data.addProperty("source", "bank");
+        data.addProperty("portable", portable);
+        if (!portable) data.addProperty("pos", pos);
+        TreasuryNetwork.sendAction("history_open", data);
     }
 
     @Override

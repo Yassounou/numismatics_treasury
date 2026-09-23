@@ -85,6 +85,7 @@ public final class TreasuryConfig {
         if (config.modules == null) config.modules = new Modules();
         if (config.pay == null) config.pay = new Pay();
         if (config.auctionHouse == null) config.auctionHouse = new AuctionHouse();
+        if (config.history == null) config.history = new History();
         config.pay.minimum = Math.max(1, config.pay.minimum);
         config.pay.maximum = Math.max(config.pay.minimum, config.pay.maximum);
         config.auctionHouse.commissionPercent = Math.max(
@@ -117,6 +118,15 @@ public final class TreasuryConfig {
         if (config.auctionHouse.allowedDurationsHours.isEmpty()) {
             config.auctionHouse.allowedDurationsHours.add(24);
         }
+        config.history.retentionDays = Math.max(1, Math.min(365, config.history.retentionDays));
+        config.history.maximumEntriesPerPlayer = Math.max(
+                25,
+                Math.min(5_000, config.history.maximumEntriesPerPlayer)
+        );
+        config.history.maximumEntriesPerShop = Math.max(
+                25,
+                Math.min(5_000, config.history.maximumEntriesPerShop)
+        );
         return config;
     }
 
@@ -124,6 +134,7 @@ public final class TreasuryConfig {
         public Modules modules = new Modules();
         public Pay pay = new Pay();
         public AuctionHouse auctionHouse = new AuctionHouse();
+        public History history = new History();
     }
 
     public static final class Modules {
@@ -148,6 +159,18 @@ public final class TreasuryConfig {
         public List<Integer> allowedDurationsHours = new ArrayList<>(
                 List.of(1, 6, 12, 24, 48)
         );
+    }
+
+    public static final class History {
+        public boolean enabled = true;
+        public int retentionDays = 30;
+        public int maximumEntriesPerPlayer = 500;
+        public int maximumEntriesPerShop = 500;
+        public boolean recordTransfers = true;
+        public boolean recordServerShops = true;
+        public boolean recordPlayerShops = true;
+        public boolean recordAuctionHouse = true;
+        public boolean operatorGlobalStatistics = true;
     }
 
     public record ReloadResult(boolean successful, Component message) {
