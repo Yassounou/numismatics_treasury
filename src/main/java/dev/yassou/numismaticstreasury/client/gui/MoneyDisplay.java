@@ -32,8 +32,7 @@ public final class MoneyDisplay {
     public static void renderBadge(GuiGraphics graphics, Font font, int x, int y, long amount) {
         int width = badgeWidth(font, amount);
         int height = 18;
-        graphics.fill(x + 2, y, x + width - 2, y + height, BACKGROUND);
-        graphics.fill(x, y + 2, x + width, y + height - 2, BACKGROUND);
+        fillRounded(graphics, x, y, width, height, BACKGROUND);
         outline(graphics, x, y, width, height, GOLD);
         renderIcon(graphics, x + 8, y + 5);
         Component label = Component.translatable("screen.numismatics_treasury.balance");
@@ -53,9 +52,38 @@ public final class MoneyDisplay {
     }
 
     public static void outline(GuiGraphics graphics, int x, int y, int width, int height, int color) {
-        graphics.fill(x + 2, y, x + width - 2, y + 1, color);
-        graphics.fill(x + 2, y + height - 1, x + width - 2, y + height, color);
-        graphics.fill(x, y + 2, x + 1, y + height - 2, color);
-        graphics.fill(x + width - 1, y + 2, x + width, y + height - 2, color);
+        if (width < 8 || height < 8) return;
+        graphics.fill(x + 4, y, x + width - 4, y + 1, color);
+        graphics.fill(x + 2, y + 1, x + 4, y + 2, color);
+        graphics.fill(x + width - 4, y + 1, x + width - 2, y + 2, color);
+        graphics.fill(x + 1, y + 2, x + 2, y + 4, color);
+        graphics.fill(x + width - 2, y + 2, x + width - 1, y + 4, color);
+        graphics.fill(x, y + 4, x + 1, y + height - 4, color);
+        graphics.fill(x + width - 1, y + 4, x + width, y + height - 4, color);
+        graphics.fill(x + 1, y + height - 4, x + 2, y + height - 2, color);
+        graphics.fill(x + width - 2, y + height - 4,
+                x + width - 1, y + height - 2, color);
+        graphics.fill(x + 2, y + height - 2, x + 4, y + height - 1, color);
+        graphics.fill(x + width - 4, y + height - 2,
+                x + width - 2, y + height - 1, color);
+        graphics.fill(x + 4, y + height - 1, x + width - 4, y + height, color);
+    }
+
+    public static void fillRounded(
+            GuiGraphics graphics,
+            int x,
+            int y,
+            int width,
+            int height,
+            int color
+    ) {
+        if (width < 8 || height < 8) {
+            graphics.fill(x, y, x + width, y + height, color);
+            return;
+        }
+        graphics.fill(x + 4, y, x + width - 4, y + height, color);
+        graphics.fill(x + 2, y + 1, x + width - 2, y + height - 1, color);
+        graphics.fill(x + 1, y + 2, x + width - 1, y + height - 2, color);
+        graphics.fill(x, y + 4, x + width, y + height - 4, color);
     }
 }

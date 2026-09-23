@@ -12,6 +12,13 @@
   commission totals.
 - Added configurable retention, entry limits, recorded modules, and operator
   statistics access.
+- Added a compact local display-settings panel that can hide the balance badge
+  and updated Treasury outlines with the rounded pixel treatment used by the
+  balance display.
+- Player Shop stock withdrawal now opens a dedicated quantity selector with a
+  safe maximum based on the shop stock and available inventory space.
+- Unowned Player Shops placed by a Schematicannon can now be claimed with a
+  sneak-right-click or broken while empty.
 - Kept all statistics in separate world data. Existing shops remain unchanged
   and begin collecting statistics from zero after installing this test build.
 

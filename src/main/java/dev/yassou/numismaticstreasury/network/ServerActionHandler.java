@@ -56,6 +56,8 @@ public final class ServerActionHandler {
                 case "player_shop_trade" -> tradePlayerShop(player, data);
                 case "player_shop_menu_config" -> configurePlayerShopMenu(player, data);
                 case "player_shop_menu_withdraw" -> withdrawPlayerShopMenu(player, data);
+                case "player_shop_withdraw_amount" -> withdrawPlayerShopAmount(player, data);
+                case "player_shop_withdraw_back" -> backFromPlayerShopWithdraw(player, data);
                 case "player_shop_open_associates" -> openPlayerShopAssociates(player, data);
                 case "player_shop_associate_save" -> savePlayerShopAssociate(player, data);
                 case "player_shop_associate_remove" -> removePlayerShopAssociate(player, data);
@@ -361,20 +363,12 @@ public final class ServerActionHandler {
                     "message.numismatics_treasury.player_shop.clear_input_first");
             return;
         }
-        ItemStack template = shop.template();
-        if (template.isEmpty() || shop.stock() <= 0L) {
+        if (shop.template().isEmpty() || shop.stock() <= 0L) {
             message(player, false, "message.numismatics_treasury.player_shop.no_stock");
             return;
         }
-        int amount = (int) Math.min(shop.stock(), InventoryUtil.capacity(player, template));
-        if (amount <= 0) {
-            message(player, false, "message.numismatics_treasury.inventory_no_space");
-            return;
-        }
-        if (shop.removeStock(amount)) {
-            InventoryUtil.give(player, template, amount);
-            message(player, true, "message.numismatics_treasury.player_shop.withdrawn", amount);
-        }
+        player.closeContainer();
+        TreasuryNetwork.openPlayerShopWithdraw(player, shop, "menu");
     }
 
     private static void openPlayerShopAssociates(
@@ -614,17 +608,62 @@ public final class ServerActionHandler {
     private static void withdrawPlayerShop(ServerPlayer player, JsonObject data) {
         ServerShopBlockEntity shop = playerShop(player, data, true);
         if (shop == null) return;
-        ItemStack template = shop.template();
-        int amount = (int) Math.min(shop.stock(), template.getMaxStackSize());
-        if (template.isEmpty() || amount <= 0) {
+        if (shop.template().isEmpty() || shop.stock() <= 0L) {
             message(player, false, "message.numismatics_treasury.player_shop.no_stock");
-        } else if (!InventoryUtil.canFit(player, template, amount)) {
-            message(player, false, "message.numismatics_treasury.inventory_no_space");
-        } else if (shop.removeStock(amount)) {
-            InventoryUtil.give(player, template, amount);
-            message(player, true, "message.numismatics_treasury.player_shop.withdrawn", amount);
+            TreasuryNetwork.openPlayerShopAdmin(player, shop);
+            return;
         }
-        TreasuryNetwork.openPlayerShopAdmin(player, shop);
+        TreasuryNetwork.openPlayerShopWithdraw(player, shop, "screen");
+    }
+
+    private static void withdrawPlayerShopAmount(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop == null) return;
+        ItemStack template = shop.template();
+        long requested = data.has("amount") ? data.get("amount").getAsLong() : 0L;
+        if (template.isEmpty() || shop.stock() <= 0L) {
+            message(player, false, "message.numismatics_treasury.player_shop.no_stock");
+        } else if (requested <= 0L || requested > Integer.MAX_VALUE
+                || requested > shop.stock()) {
+            message(player, false, "message.numismatics_treasury.quantity_invalid");
+        } else {
+            int amount = (int) requested;
+            if (!InventoryUtil.canFit(player, template, amount)) {
+                message(player, false, "message.numismatics_treasury.inventory_no_space");
+            } else if (shop.removeStock(amount)) {
+                InventoryUtil.give(player, template, amount);
+                message(player, true,
+                        "message.numismatics_treasury.player_shop.withdrawn", amount);
+            }
+        }
+        returnFromPlayerShopWithdraw(player, shop, withdrawSource(data));
+    }
+
+    private static void backFromPlayerShopWithdraw(
+            ServerPlayer player,
+            JsonObject data
+    ) {
+        ServerShopBlockEntity shop = playerShop(player, data, true);
+        if (shop != null) {
+            returnFromPlayerShopWithdraw(player, shop, withdrawSource(data));
+        }
+    }
+
+    private static String withdrawSource(JsonObject data) {
+        return data.has("source") && data.get("source").getAsString().equals("menu")
+                ? "menu" : "screen";
+    }
+
+    private static void returnFromPlayerShopWithdraw(
+            ServerPlayer player,
+            ServerShopBlockEntity shop,
+            String source
+    ) {
+        if (source.equals("menu")) player.openMenu(shop);
+        else TreasuryNetwork.openPlayerShopAdmin(player, shop);
     }
 
     private static void tradePlayerShop(ServerPlayer player, JsonObject data) {

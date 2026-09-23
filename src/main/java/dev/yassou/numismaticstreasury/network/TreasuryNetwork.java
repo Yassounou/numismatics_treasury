@@ -8,6 +8,7 @@ import dev.yassou.numismaticstreasury.config.TreasuryConfig;
 import dev.yassou.numismaticstreasury.network.payload.OpenTreasuryScreenPayload;
 import dev.yassou.numismaticstreasury.network.payload.TreasuryActionPayload;
 import dev.yassou.numismaticstreasury.server.BankService;
+import dev.yassou.numismaticstreasury.server.InventoryUtil;
 import dev.yassou.numismaticstreasury.server.auction.AuctionListing;
 import dev.yassou.numismaticstreasury.server.auction.TreasuryData;
 import dev.yassou.numismaticstreasury.server.history.HistoryData;
@@ -28,7 +29,7 @@ import java.util.Map;
 
 public final class TreasuryNetwork {
     public static final Gson GSON = new Gson();
-    private static final String PROTOCOL_VERSION = "5";
+    private static final String PROTOCOL_VERSION = "6";
 
     private TreasuryNetwork() {
     }
@@ -120,6 +121,23 @@ public final class TreasuryNetwork {
         }
         data.add("associates", associates);
         open(player, "player_shop_associates", data);
+    }
+
+    public static void openPlayerShopWithdraw(
+            ServerPlayer player,
+            ServerShopBlockEntity shop,
+            String source
+    ) {
+        ItemStack item = shop.template();
+        int capacity = item.isEmpty() ? 0 : InventoryUtil.capacity(player, item);
+        JsonObject data = new JsonObject();
+        data.addProperty("pos", shop.getBlockPos().asLong());
+        data.addProperty("source", source);
+        data.addProperty("stock", shop.stock());
+        data.addProperty("capacity", capacity);
+        data.addProperty("maximum", Math.min(shop.stock(), (long) capacity));
+        addItem(data, item, player.registryAccess(), true);
+        open(player, "player_shop_withdraw", data);
     }
 
     public static void openHistoryStats(

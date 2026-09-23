@@ -34,6 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import org.jetbrains.annotations.Nullable;
@@ -64,7 +65,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
                 instanceof PlayerShopBlock)
                 || !(event.getLevel().getBlockEntity(event.getPos())
                 instanceof ServerShopBlockEntity shop)
-                || !shop.canManage(player)) {
+                || shop.hasOwner() && !shop.canManage(player)) {
             return;
         }
         event.setUseBlock(TriState.TRUE);
@@ -81,7 +82,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         String message = null;
         if (shop.stock() > 0L) {
             message = "message.numismatics_treasury.player_shop.stock_not_empty";
-        } else if (!shop.canManage(player)) {
+        } else if (shop.hasOwner() && !shop.canManage(player)) {
             message = "message.numismatics_treasury.player_shop.not_owner";
         }
         if (message != null) {
@@ -103,12 +104,11 @@ public final class PlayerShopBlock extends BaseEntityBlock {
             ItemStack stack
     ) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        if (!level.isClientSide && placer instanceof Player player
+        if (!level.isClientSide && placer instanceof ServerPlayer serverPlayer
+                && !(serverPlayer instanceof FakePlayer)
                 && level.getBlockEntity(pos) instanceof ServerShopBlockEntity shop) {
-            shop.setOwner(player.getUUID(), player.getGameProfile().getName());
-            if (player instanceof ServerPlayer serverPlayer) {
-                BankService.account(serverPlayer);
-            }
+            shop.setOwner(serverPlayer.getUUID(), serverPlayer.getGameProfile().getName());
+            BankService.account(serverPlayer);
         }
     }
 
@@ -149,6 +149,22 @@ public final class PlayerShopBlock extends BaseEntityBlock {
             return true;
         }
         if (!(player instanceof ServerPlayer serverPlayer)) return true;
+        if (!shop.hasOwner()) {
+            if (shop.stock() > 0L && !player.hasPermissions(2)) {
+                player.sendSystemMessage(Component.translatable(
+                        "message.numismatics_treasury.player_shop.unowned_stock"));
+            } else if (player.isShiftKeyDown()) {
+                shop.setOwner(player.getUUID(), player.getGameProfile().getName());
+                BankService.account(serverPlayer);
+                player.sendSystemMessage(Component.translatable(
+                        "message.numismatics_treasury.player_shop.claimed"));
+                serverPlayer.openMenu(shop);
+            } else {
+                player.sendSystemMessage(Component.translatable(
+                        "message.numismatics_treasury.player_shop.unowned"));
+            }
+            return true;
+        }
         if (player.isShiftKeyDown() && shop.canManage(player)) {
             serverPlayer.openMenu(shop);
         } else if (!shop.configured()) {

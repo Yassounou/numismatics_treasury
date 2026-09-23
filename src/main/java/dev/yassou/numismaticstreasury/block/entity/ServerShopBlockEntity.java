@@ -99,6 +99,7 @@ public final class ServerShopBlockEntity extends BlockEntity implements MenuProv
     public int lotSize() { return lotSize; }
     @Nullable public UUID ownerUuid() { return ownerUuid; }
     public String ownerName() { return ownerName; }
+    public boolean hasOwner() { return ownerUuid != null; }
     public List<LinkedPlayer> linkedPlayers() { return List.copyOf(linkedPlayers.values()); }
     public long stock() { return stock; }
     public boolean configured() { return !template.isEmpty() && price > 0; }

@@ -3,6 +3,7 @@ package dev.yassou.numismaticstreasury.client.screen;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import dev.yassou.numismaticstreasury.client.TreasuryClientPreferences;
 import dev.yassou.numismaticstreasury.client.gui.MoneyDisplay;
 import dev.yassou.numismaticstreasury.client.gui.TreasuryButton;
 import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
@@ -48,6 +49,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private int scroll;
     private int selectedShopIndex;
     private boolean draggingScrollbar;
+    private boolean settingsOpen;
     private boolean leaving;
 
     public HistoryStatsScreen(String json) {
@@ -102,9 +104,22 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     .build());
         }
         addRenderableWidget(TreasuryButton.builder(
+                        Component.literal("⚙"), ignored -> toggleSettings())
+                .selected(settingsOpen)
+                .bounds(panelLeft + panelWidth - 49, panelTop + 5, 20, 18)
+                .build());
+        addRenderableWidget(TreasuryButton.builder(
                         Component.literal("×"), ignored -> leave())
                 .bounds(panelLeft + panelWidth - 25, panelTop + 5, 20, 18)
                 .build());
+        if (settingsOpen) {
+            addRenderableWidget(TreasuryButton.builder(
+                            balanceSettingLabel(), ignored -> toggleBalance())
+                    .selected(TreasuryClientPreferences.showHistoryBalance())
+                    .bounds(panelLeft + panelWidth - 179,
+                            panelTop + 91, 157, 20)
+                    .build());
+        }
     }
 
     private List<Tab> visibleTabs() {
@@ -123,6 +138,26 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private void rebuildScreen() {
         clearWidgets();
         init();
+    }
+
+    private void toggleSettings() {
+        settingsOpen = !settingsOpen;
+        rebuildScreen();
+    }
+
+    private void toggleBalance() {
+        TreasuryClientPreferences.setShowHistoryBalance(
+                !TreasuryClientPreferences.showHistoryBalance());
+        rebuildScreen();
+    }
+
+    private Component balanceSettingLabel() {
+        return Component.translatable(
+                "screen.numismatics_treasury.history.settings.show_balance",
+                Component.translatable(TreasuryClientPreferences.showHistoryBalance()
+                        ? "screen.numismatics_treasury.history.settings.on"
+                        : "screen.numismatics_treasury.history.settings.off")
+        );
     }
 
     @Override
@@ -191,20 +226,35 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderPanel(graphics);
-        MoneyDisplay.renderBadge(
-                graphics,
-                font,
-                panelLeft + panelWidth - MoneyDisplay.badgeWidth(font, balance) - 34,
-                panelTop + 6,
-                balance
-        );
+        if (TreasuryClientPreferences.showHistoryBalance()) {
+            MoneyDisplay.renderBadge(
+                    graphics,
+                    font,
+                    panelLeft + panelWidth - MoneyDisplay.badgeWidth(font, balance) - 58,
+                    panelTop + 6,
+                    balance
+            );
+        }
         switch (tab) {
             case OVERVIEW -> renderOverview(graphics);
             case HISTORY -> renderHistory(graphics);
             case SHOPS -> renderShops(graphics);
             case SERVER -> renderServer(graphics);
         }
+        if (settingsOpen) renderSettings(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    private void renderSettings(GuiGraphics graphics) {
+        int x = panelLeft + panelWidth - 187;
+        int y = panelTop + 62;
+        int width = 173;
+        int height = 58;
+        MoneyDisplay.fillRounded(graphics, x, y, width, height, 0xFC171717);
+        MoneyDisplay.outline(graphics, x, y, width, height, ACCENT);
+        graphics.drawString(font, Component.translatable(
+                        "screen.numismatics_treasury.history.settings.title"),
+                x + 10, y + 10, ACCENT, false);
     }
 
     private void renderOverview(GuiGraphics graphics) {
