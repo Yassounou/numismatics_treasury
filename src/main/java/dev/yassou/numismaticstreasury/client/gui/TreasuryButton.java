@@ -26,6 +26,8 @@ public final class TreasuryButton extends Button {
     private final OnPress requestedOnPress;
     private final Component confirmationMessage;
     private final ResourceLocation icon;
+    private final float iconScale;
+    private final int iconYOffset;
     private boolean pressedByMouse;
     private long keyboardPressedUntil;
     private boolean awaitingConfirmation;
@@ -39,6 +41,8 @@ public final class TreasuryButton extends Button {
         requestedOnPress = builder.requestedOnPress;
         confirmationMessage = builder.confirmationMessage;
         icon = builder.icon;
+        iconScale = builder.iconScale;
+        iconYOffset = builder.iconYOffset;
         if (icon != null) setTooltip(Tooltip.create(getMessage()));
     }
 
@@ -79,10 +83,17 @@ public final class TreasuryButton extends Button {
         RenderSystem.enableBlend();
         graphics.blitSprite(currentSprite(minecraft), getX(), getY(), getWidth(), getHeight());
         if (icon != null) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(
+                    getX() + getWidth() / 2.0F,
+                    getY() + getHeight() / 2.0F + iconYOffset,
+                    0.0F
+            );
+            graphics.pose().scale(iconScale, iconScale, 1.0F);
             graphics.blit(
                     icon,
-                    getX() + (getWidth() - 16) / 2,
-                    getY() + (getHeight() - 16) / 2,
+                    -8,
+                    -8,
                     0,
                     0,
                     16,
@@ -90,6 +101,7 @@ public final class TreasuryButton extends Button {
                     16,
                     16
             );
+            graphics.pose().popPose();
         }
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
         if (icon == null) {
@@ -145,6 +157,8 @@ public final class TreasuryButton extends Button {
         private final OnPress requestedOnPress;
         private Component confirmationMessage;
         private ResourceLocation icon;
+        private float iconScale = 1.0F;
+        private int iconYOffset;
 
         private Builder(Component message, OnPress onPress) {
             super(message, ignored -> { });
@@ -154,6 +168,11 @@ public final class TreasuryButton extends Button {
         public Builder green() { green = true; return this; }
         public Builder selected(boolean value) { selected = value; return this; }
         public Builder icon(ResourceLocation value) { icon = value; return this; }
+        public Builder iconScale(float value) {
+            iconScale = Mth.clamp(value, 0.25F, 2.0F);
+            return this;
+        }
+        public Builder iconYOffset(int value) { iconYOffset = value; return this; }
         public Builder confirmation(Component message) {
             confirmationMessage = message;
             return this;

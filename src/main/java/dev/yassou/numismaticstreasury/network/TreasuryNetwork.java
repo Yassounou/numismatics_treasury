@@ -156,6 +156,10 @@ public final class TreasuryNetwork {
         if (returnPos != null) data.addProperty("returnPos", returnPos.asLong());
         data.addProperty("balance", BankService.balance(player));
         data.addProperty("operator", player.hasPermissions(2));
+        data.addProperty(
+                "notificationsEnabled",
+                TreasuryData.get(player.getServer()).notificationsEnabled(player.getUUID())
+        );
         if (contextShop != null) {
             data.addProperty("selectedShop", HistoryService.shopKey(contextShop));
         }
@@ -180,8 +184,12 @@ public final class TreasuryNetwork {
             value.addProperty("type", entry.type().name());
             value.addProperty("amount", entry.amount());
             value.addProperty("quantity", entry.quantity());
-            value.addProperty("itemId", entry.itemId());
-            value.addProperty("itemName", entry.itemName());
+            if (entry.item() != null && !entry.item().isEmpty()) {
+                addItem(value, entry.item(), player.registryAccess(), true);
+            } else {
+                value.addProperty("itemId", entry.itemId());
+                value.addProperty("itemName", entry.itemName());
+            }
             value.addProperty("counterparty", entry.counterparty());
             value.addProperty("detail", entry.detail());
             entries.add(value);
@@ -195,7 +203,8 @@ public final class TreasuryNetwork {
             if (selected != null) visibleShops.put(selected.key(), selected);
         }
         JsonArray shops = new JsonArray();
-        visibleShops.values().forEach(shop -> shops.add(shopStats(shop)));
+        visibleShops.values().forEach(shop -> shops.add(
+                shopStats(shop, player.registryAccess())));
         data.add("shops", shops);
 
         if (player.hasPermissions(2)
@@ -214,7 +223,10 @@ public final class TreasuryNetwork {
         open(player, "history_stats", data);
     }
 
-    private static JsonObject shopStats(HistoryData.ShopStats shop) {
+    private static JsonObject shopStats(
+            HistoryData.ShopStats shop,
+            HolderLookup.Provider registries
+    ) {
         long now = System.currentTimeMillis();
         JsonObject value = new JsonObject();
         value.addProperty("key", shop.key());
@@ -223,6 +235,9 @@ public final class TreasuryNetwork {
         value.addProperty("pos", shop.pos());
         value.addProperty("itemId", shop.itemId());
         value.addProperty("itemName", shop.itemName());
+        if (!shop.item().isEmpty()) {
+            addItem(value, shop.item(), registries, true);
+        }
         value.addProperty("startedAt", shop.startedAt());
         value.addProperty("sales", shop.sales());
         value.addProperty("itemsSold", shop.itemsSold());

@@ -98,6 +98,7 @@ public final class HistoryService {
                 shop.getBlockPos().asLong(),
                 itemId(item),
                 itemName(item),
+                item,
                 buyer.getGameProfile().getName(),
                 quantity,
                 total,
@@ -240,7 +241,8 @@ public final class HistoryService {
                 shop.getLevel().dimension().location().toString(),
                 shop.getBlockPos().asLong(),
                 itemId(item),
-                itemName(item)
+                itemName(item),
+                item
         );
     }
 
@@ -271,6 +273,8 @@ public final class HistoryService {
                 Math.max(0, quantity),
                 itemId(item),
                 itemName(item),
+                item == null || item.isEmpty()
+                        ? ItemStack.EMPTY : item.copy(),
                 counterparty == null ? "" : counterparty,
                 detail == null ? "" : detail
         );

@@ -310,8 +310,13 @@ public final class AuctionService {
 
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        TreasuryData data = TreasuryData.get(player.getServer());
+        if (!data.notificationsEnabled(player.getUUID())) {
+            data.drainNotifications(player.getUUID());
+            return;
+        }
         for (TreasuryNotification notification
-                : TreasuryData.get(player.getServer()).drainNotifications(player.getUUID())) {
+                : data.drainNotifications(player.getUUID())) {
             player.sendSystemMessage(notification.component());
         }
     }
@@ -381,11 +386,13 @@ public final class AuctionService {
             String key,
             Object... arguments
     ) {
+        TreasuryData data = TreasuryData.get(server);
+        if (!data.notificationsEnabled(playerUuid)) return;
         ServerPlayer player = server.getPlayerList().getPlayer(playerUuid);
         if (player != null) {
             player.sendSystemMessage(Component.translatable(key, arguments));
         } else {
-            TreasuryData.get(server).addNotification(playerUuid, key, arguments);
+            data.addNotification(playerUuid, key, arguments);
         }
     }
 

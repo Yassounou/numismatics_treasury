@@ -6,6 +6,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
@@ -63,7 +64,8 @@ public final class HistoryData extends SavedData {
             String dimension,
             long pos,
             String itemId,
-            String itemName
+            String itemName,
+            ItemStack item
     ) {
         ShopStats stats = shops.computeIfAbsent(key, ignored -> new ShopStats(
                 key,
@@ -73,7 +75,7 @@ public final class HistoryData extends SavedData {
                 pos,
                 System.currentTimeMillis()
         ));
-        stats.update(ownerUuid, ownerName, itemId, itemName);
+        stats.update(ownerUuid, ownerName, itemId, itemName, item);
         setDirty();
         return stats;
     }
@@ -86,13 +88,14 @@ public final class HistoryData extends SavedData {
             long pos,
             String itemId,
             String itemName,
+            ItemStack item,
             String buyerName,
             int quantity,
             int total,
             Map<UUID, BeneficiaryShare> shares
     ) {
         ShopStats stats = ensureShop(
-                key, ownerUuid, ownerName, dimension, pos, itemId, itemName);
+                key, ownerUuid, ownerName, dimension, pos, itemId, itemName, item);
         stats.recordSale(buyerName, quantity, total, shares);
         pruneSales(stats.recentSales);
         setDirty();
@@ -154,7 +157,7 @@ public final class HistoryData extends SavedData {
             CompoundTag player = new CompoundTag();
             player.putUUID("uuid", uuid);
             ListTag savedEntries = new ListTag();
-            entries.forEach(entry -> savedEntries.add(entry.save()));
+            entries.forEach(entry -> savedEntries.add(entry.save(registries)));
             player.put("entries", savedEntries);
             PlayerTotals totals = playerTotals.get(uuid);
             if (totals != null) player.put("totals", totals.save());
@@ -163,7 +166,7 @@ public final class HistoryData extends SavedData {
         tag.put("players", players);
 
         ListTag savedShops = new ListTag();
-        shops.values().forEach(shop -> savedShops.add(shop.save()));
+        shops.values().forEach(shop -> savedShops.add(shop.save(registries)));
         tag.put("shops", savedShops);
         tag.put("global", global.save());
         return tag;
@@ -180,7 +183,7 @@ public final class HistoryData extends SavedData {
             UUID uuid = player.getUUID("uuid");
             List<HistoryEntry> entries = new ArrayList<>();
             for (Tag saved : player.getList("entries", Tag.TAG_COMPOUND)) {
-                HistoryEntry entry = HistoryEntry.load((CompoundTag) saved);
+                HistoryEntry entry = HistoryEntry.load((CompoundTag) saved, registries);
                 if (entry != null) entries.add(entry);
             }
             entries.sort(Comparator.comparingLong(HistoryEntry::timestamp).reversed());
@@ -190,7 +193,7 @@ public final class HistoryData extends SavedData {
             }
         }
         for (Tag value : tag.getList("shops", Tag.TAG_COMPOUND)) {
-            ShopStats shop = ShopStats.load((CompoundTag) value);
+            ShopStats shop = ShopStats.load((CompoundTag) value, registries);
             if (shop != null) data.shops.put(shop.key, shop);
         }
         if (tag.contains("global", Tag.TAG_COMPOUND)) {
@@ -308,6 +311,7 @@ public final class HistoryData extends SavedData {
         private final long pos;
         private String itemId = "minecraft:air";
         private String itemName = "";
+        private ItemStack item = ItemStack.EMPTY;
         private final long startedAt;
         private long sales;
         private long itemsSold;
@@ -333,11 +337,19 @@ public final class HistoryData extends SavedData {
             this.startedAt = startedAt;
         }
 
-        private void update(UUID ownerUuid, String ownerName, String itemId, String itemName) {
+        private void update(
+                UUID ownerUuid,
+                String ownerName,
+                String itemId,
+                String itemName,
+                ItemStack item
+        ) {
             this.ownerUuid = ownerUuid;
             this.ownerName = safe(ownerName);
             this.itemId = safe(itemId);
             this.itemName = safe(itemName);
+            this.item = item == null || item.isEmpty()
+                    ? ItemStack.EMPTY : item.copyWithCount(1);
         }
 
         private void recordSale(
@@ -371,6 +383,7 @@ public final class HistoryData extends SavedData {
         public long pos() { return pos; }
         public String itemId() { return itemId; }
         public String itemName() { return itemName; }
+        public ItemStack item() { return item.copy(); }
         public long startedAt() { return startedAt; }
         public long sales() { return sales; }
         public long itemsSold() { return itemsSold; }
@@ -394,7 +407,7 @@ public final class HistoryData extends SavedData {
             return new PeriodStats(sales, items, revenue);
         }
 
-        private CompoundTag save() {
+        private CompoundTag save(HolderLookup.Provider registries) {
             CompoundTag tag = new CompoundTag();
             tag.putString("key", key);
             if (ownerUuid != null) tag.putUUID("ownerUuid", ownerUuid);
@@ -403,6 +416,7 @@ public final class HistoryData extends SavedData {
             tag.putLong("pos", pos);
             tag.putString("itemId", itemId);
             tag.putString("itemName", itemName);
+            if (!item.isEmpty()) tag.put("item", item.saveOptional(registries));
             tag.putLong("startedAt", startedAt);
             tag.putLong("sales", sales);
             tag.putLong("itemsSold", itemsSold);
@@ -422,7 +436,10 @@ public final class HistoryData extends SavedData {
             return tag;
         }
 
-        private static ShopStats load(CompoundTag tag) {
+        private static ShopStats load(
+                CompoundTag tag,
+                HolderLookup.Provider registries
+        ) {
             if (!tag.hasUUID("ownerUuid") || tag.getString("key").isBlank()) return null;
             ShopStats stats = new ShopStats(
                     tag.getString("key"),
@@ -434,6 +451,9 @@ public final class HistoryData extends SavedData {
             );
             stats.itemId = tag.getString("itemId");
             stats.itemName = tag.getString("itemName");
+            stats.item = tag.contains("item", Tag.TAG_COMPOUND)
+                    ? ItemStack.parseOptional(registries, tag.getCompound("item"))
+                    : ItemStack.EMPTY;
             stats.sales = tag.getLong("sales");
             stats.itemsSold = tag.getLong("itemsSold");
             stats.grossRevenue = tag.getLong("grossRevenue");

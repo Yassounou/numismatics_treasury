@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.yassou.numismaticstreasury.config.TreasuryConfig;
 import dev.yassou.numismaticstreasury.network.TreasuryNetwork;
 import dev.yassou.numismaticstreasury.server.history.HistoryService;
+import dev.yassou.numismaticstreasury.server.auction.TreasuryData;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
@@ -116,7 +117,8 @@ public final class TreasuryCommands {
         if (result.successful()) {
             ServerPlayer recipient = sender.getServer().getPlayerList()
                     .getPlayer(target.get().getId());
-            if (recipient != null) {
+            if (recipient != null && TreasuryData.get(sender.getServer())
+                    .notificationsEnabled(recipient.getUUID())) {
                 recipient.sendSystemMessage(Component.translatable(
                         "notification.numismatics_treasury.pay.received",
                         sender.getGameProfile().getName(),

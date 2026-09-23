@@ -64,6 +64,7 @@ public final class ServerActionHandler {
                 case "player_shop_associate_back" -> backToPlayerShop(player, data);
                 case "history_open" -> openHistory(player, data);
                 case "player_shop_open_stats" -> openPlayerShopStats(player, data);
+                case "history_notifications" -> historyNotifications(player, data);
                 case "history_back" -> closeHistory(player, data);
                 case "auction_create" -> auctionCreate(player, data);
                 case "auction_buy" -> auctionBuy(player, data);
@@ -124,7 +125,9 @@ public final class ServerActionHandler {
             message(player, transfer.successful(), transfer.message());
             ServerPlayer recipient = player.getServer().getPlayerList()
                     .getPlayer(target.get().getId());
-            if (transfer.successful() && recipient != null) {
+            if (transfer.successful() && recipient != null
+                    && TreasuryData.get(player.getServer())
+                    .notificationsEnabled(recipient.getUUID())) {
                 recipient.sendSystemMessage(Component.translatable(
                         "notification.numismatics_treasury.pay.received",
                         player.getGameProfile().getName(),
@@ -148,6 +151,12 @@ public final class ServerActionHandler {
     private static boolean holdsPortableTerminal(ServerPlayer player) {
         return player.getMainHandItem().is(TreasuryContent.PORTABLE_TRANSFER_TERMINAL.get())
                 || player.getOffhandItem().is(TreasuryContent.PORTABLE_TRANSFER_TERMINAL.get());
+    }
+
+    private static void historyNotifications(ServerPlayer player, JsonObject data) {
+        boolean enabled = !data.has("enabled") || data.get("enabled").getAsBoolean();
+        TreasuryData.get(player.getServer())
+                .setNotificationsEnabled(player.getUUID(), enabled);
     }
 
     private static void reopenBankTeller(
@@ -820,6 +829,8 @@ public final class ServerActionHandler {
             int received
     ) {
         if (beneficiaryUuid == null) return;
+        TreasuryData treasury = TreasuryData.get(buyer.getServer());
+        if (!treasury.notificationsEnabled(beneficiaryUuid)) return;
         Object[] arguments = {
                 buyer.getGameProfile().getName(),
                 item.getHoverName().getString(),
@@ -834,7 +845,7 @@ public final class ServerActionHandler {
                     arguments
             ));
         } else {
-            TreasuryData.get(buyer.getServer()).addNotification(
+            treasury.addNotification(
                     beneficiaryUuid,
                     "notification.numismatics_treasury.player_shop.sold",
                     arguments
@@ -848,6 +859,8 @@ public final class ServerActionHandler {
             String ownerName,
             int percent
     ) {
+        TreasuryData treasury = TreasuryData.get(editor.getServer());
+        if (!treasury.notificationsEnabled(associateUuid)) return;
         Object[] arguments = {ownerName, percent};
         ServerPlayer associate = editor.getServer().getPlayerList()
                 .getPlayer(associateUuid);
@@ -857,7 +870,7 @@ public final class ServerActionHandler {
                     arguments
             ));
         } else {
-            TreasuryData.get(editor.getServer()).addNotification(
+            treasury.addNotification(
                     associateUuid,
                     "notification.numismatics_treasury.player_shop.associate_added",
                     arguments
@@ -872,6 +885,8 @@ public final class ServerActionHandler {
             int previousPercent,
             int percent
     ) {
+        TreasuryData treasury = TreasuryData.get(editor.getServer());
+        if (!treasury.notificationsEnabled(associateUuid)) return;
         Object[] arguments = {ownerName, previousPercent, percent};
         ServerPlayer associate = editor.getServer().getPlayerList()
                 .getPlayer(associateUuid);
@@ -881,7 +896,7 @@ public final class ServerActionHandler {
                     arguments
             ));
         } else {
-            TreasuryData.get(editor.getServer()).addNotification(
+            treasury.addNotification(
                     associateUuid,
                     "notification.numismatics_treasury.player_shop.associate_share_changed",
                     arguments

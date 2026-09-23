@@ -35,6 +35,11 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private static final int OVERVIEW_ROWS = 5;
     private static final int HISTORY_ROWS = 7;
     private static final int SHOP_ROWS = 5;
+    private static final int BENEFICIARY_ROWS = 4;
+    private static final ResourceLocation SETTINGS_ICON = ResourceLocation.fromNamespaceAndPath(
+            NumismaticsTreasury.MOD_ID,
+            "textures/gui/icons/history_settings.png"
+    );
 
     private final String source;
     private final boolean portable;
@@ -46,12 +51,19 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private final List<EntryView> entries;
     private final List<ShopView> shops;
     private final ServerView server;
+    private boolean notificationsEnabled;
     private Tab tab = Tab.OVERVIEW;
+    private ShopSort shopSort = ShopSort.RECENT;
     private int scroll;
+    private int beneficiaryScroll;
     private int selectedShopIndex;
     private boolean draggingScrollbar;
+    private boolean draggingBeneficiaryScrollbar;
     private boolean settingsOpen;
     private boolean leaving;
+    private ItemStack hoveredItem = ItemStack.EMPTY;
+    private int currentMouseX;
+    private int currentMouseY;
 
     public HistoryStatsScreen(String json) {
         super(Component.translatable("screen.numismatics_treasury.history.title"));
@@ -61,6 +73,8 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         returnPos = ClientScreenData.longValue(data, "returnPos", Long.MIN_VALUE);
         balance = ClientScreenData.integer(data, "balance", 0);
         operator = ClientScreenData.bool(data, "operator", false);
+        notificationsEnabled = ClientScreenData.bool(
+                data, "notificationsEnabled", true);
         selectedShop = ClientScreenData.string(data, "selectedShop", "");
         totals = TotalsView.parse(object(data, "totals"));
 
@@ -77,7 +91,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         parsedShops.sort(Comparator
                 .comparing((ShopView value) -> !value.key.equals(selectedShop))
                 .thenComparing(Comparator.comparingLong(ShopView::lastSaleAt).reversed()));
-        shops = List.copyOf(parsedShops);
+        shops = parsedShops;
         for (int index = 0; index < shops.size(); index++) {
             if (shops.get(index).key.equals(selectedShop)) {
                 selectedShopIndex = index;
@@ -94,19 +108,23 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int y = panelTop + 36;
         List<Tab> tabs = visibleTabs();
         int gap = 4;
-        int width = 32;
+        int width = (panelWidth - 20 - gap * (tabs.size() - 1)) / tabs.size();
         for (int index = 0; index < tabs.size(); index++) {
             Tab value = tabs.get(index);
             addRenderableWidget(TreasuryButton.builder(
                             Component.translatable(value.key),
                             ignored -> switchTab(value))
-                    .icon(value.icon)
                     .selected(tab == value)
                     .bounds(x + index * (width + gap), y, width, 20)
                     .build());
         }
         addRenderableWidget(TreasuryButton.builder(
-                        Component.literal("⚙"), ignored -> toggleSettings())
+                        Component.translatable(
+                                "screen.numismatics_treasury.history.settings.title"),
+                        ignored -> toggleSettings())
+                .icon(SETTINGS_ICON)
+                .iconScale(0.75F)
+                .iconYOffset(-1)
                 .selected(settingsOpen)
                 .bounds(panelLeft + panelWidth - 49, panelTop + 5, 20, 18)
                 .build());
@@ -121,6 +139,18 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     .bounds(panelLeft + panelWidth - 179,
                             panelTop + 91, 157, 20)
                     .build());
+            addRenderableWidget(TreasuryButton.builder(
+                            notificationSettingLabel(), ignored -> toggleNotifications())
+                    .selected(notificationsEnabled)
+                    .bounds(panelLeft + panelWidth - 179,
+                            panelTop + 117, 157, 20)
+                    .build());
+        }
+        if (tab == Tab.SHOPS && !shops.isEmpty()) {
+            addRenderableWidget(TreasuryButton.builder(
+                            sortLabel(), ignored -> cycleShopSort())
+                    .bounds(panelLeft + 10, panelTop + 65, 190, 20)
+                    .build());
         }
     }
 
@@ -133,7 +163,9 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private void switchTab(Tab value) {
         tab = value;
         scroll = 0;
+        beneficiaryScroll = 0;
         draggingScrollbar = false;
+        draggingBeneficiaryScrollbar = false;
         rebuildScreen();
     }
 
@@ -153,10 +185,61 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         rebuildScreen();
     }
 
+    private void toggleNotifications() {
+        notificationsEnabled = !notificationsEnabled;
+        JsonObject data = new JsonObject();
+        data.addProperty("enabled", notificationsEnabled);
+        TreasuryNetwork.sendAction("history_notifications", data);
+        rebuildScreen();
+    }
+
+    private void cycleShopSort() {
+        String selectedKey = shops.isEmpty()
+                ? "" : shops.get(Math.min(selectedShopIndex, shops.size() - 1)).key;
+        shopSort = shopSort.next();
+        shops.sort(shopComparator());
+        selectedShopIndex = 0;
+        for (int index = 0; index < shops.size(); index++) {
+            if (shops.get(index).key.equals(selectedKey)) {
+                selectedShopIndex = index;
+                break;
+            }
+        }
+        scroll = Math.max(0, Math.min(selectedShopIndex, maximumScroll()));
+        beneficiaryScroll = 0;
+        rebuildScreen();
+    }
+
+    private Comparator<ShopView> shopComparator() {
+        return switch (shopSort) {
+            case RECENT -> Comparator.comparingLong(ShopView::lastSaleAt).reversed();
+            case SALES -> Comparator.comparingLong(ShopView::sales).reversed();
+            case ITEMS -> Comparator.comparingLong(ShopView::itemsSold).reversed();
+            case REVENUE -> Comparator.comparingLong(ShopView::grossRevenue).reversed();
+            case BEST_SALE -> Comparator.comparingLong(ShopView::bestSale).reversed();
+        };
+    }
+
+    private Component sortLabel() {
+        return Component.translatable(
+                "screen.numismatics_treasury.history.sort",
+                Component.translatable(shopSort.key)
+        );
+    }
+
     private Component balanceSettingLabel() {
         return Component.translatable(
                 "screen.numismatics_treasury.history.settings.show_balance",
                 Component.translatable(TreasuryClientPreferences.showHistoryBalance()
+                        ? "screen.numismatics_treasury.history.settings.on"
+                        : "screen.numismatics_treasury.history.settings.off")
+        );
+    }
+
+    private Component notificationSettingLabel() {
+        return Component.translatable(
+                "screen.numismatics_treasury.history.settings.show_notifications",
+                Component.translatable(notificationsEnabled
                         ? "screen.numismatics_treasury.history.settings.on"
                         : "screen.numismatics_treasury.history.settings.off")
         );
@@ -169,6 +252,18 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             double scrollX,
             double scrollY
     ) {
+        ScrollbarLayout beneficiary = beneficiaryScrollbarLayout();
+        if (beneficiary != null
+                && mouseX >= panelLeft + 210
+                && mouseX < panelLeft + panelWidth - 10
+                && mouseY >= beneficiary.y
+                && mouseY < beneficiary.y + beneficiary.height) {
+            int maximum = maximumBeneficiaryScroll();
+            beneficiaryScroll = Math.max(0, Math.min(maximum,
+                    beneficiaryScroll + (scrollY < 0 ? 1 : -1)));
+            return maximum > 0 || super.mouseScrolled(
+                    mouseX, mouseY, scrollX, scrollY);
+        }
         if (mouseX < panelLeft + 10 || mouseX >= panelLeft + panelWidth - 10
                 || mouseY < panelTop + 64 || mouseY >= panelTop + panelHeight - 10) {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -182,6 +277,12 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
         if (button != 0) return false;
+        ScrollbarLayout beneficiary = beneficiaryScrollbarLayout();
+        if (beneficiary != null && beneficiary.contains(mouseX, mouseY)) {
+            draggingBeneficiaryScrollbar = maximumBeneficiaryScroll() > 0;
+            updateBeneficiaryScrollFromMouse(mouseY, beneficiary);
+            return true;
+        }
         ScrollbarLayout scrollbar = scrollbarLayout();
         if (scrollbar != null && scrollbar.contains(mouseX, mouseY)) {
             draggingScrollbar = maximumScroll() > 0;
@@ -190,7 +291,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         }
         if (tab != Tab.SHOPS) return false;
         int x = panelLeft + 10;
-        int y = panelTop + 66;
+        int y = panelTop + 90;
         int listWidth = 190;
         if (mouseX < x || mouseX >= x + listWidth
                 || mouseY < y || mouseY >= y + SHOP_HEIGHT * SHOP_ROWS) {
@@ -199,6 +300,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int index = scroll + (int) ((mouseY - y) / SHOP_HEIGHT);
         if (index < 0 || index >= shops.size()) return false;
         selectedShopIndex = index;
+        beneficiaryScroll = 0;
         return true;
     }
 
@@ -210,6 +312,13 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             double dragX,
             double dragY
     ) {
+        if (draggingBeneficiaryScrollbar && button == 0) {
+            ScrollbarLayout scrollbar = beneficiaryScrollbarLayout();
+            if (scrollbar != null) {
+                updateBeneficiaryScrollFromMouse(mouseY, scrollbar);
+            }
+            return true;
+        }
         if (draggingScrollbar && button == 0) {
             ScrollbarLayout scrollbar = scrollbarLayout();
             if (scrollbar != null) updateScrollFromMouse(mouseY, scrollbar);
@@ -220,13 +329,19 @@ public final class HistoryStatsScreen extends TreasuryScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        boolean wasDragging = draggingScrollbar;
-        if (button == 0) draggingScrollbar = false;
+        boolean wasDragging = draggingScrollbar || draggingBeneficiaryScrollbar;
+        if (button == 0) {
+            draggingScrollbar = false;
+            draggingBeneficiaryScrollbar = false;
+        }
         return wasDragging || super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        hoveredItem = ItemStack.EMPTY;
+        currentMouseX = mouseX;
+        currentMouseY = mouseY;
         renderPanel(graphics);
         if (TreasuryClientPreferences.showHistoryBalance()) {
             MoneyDisplay.renderBadge(
@@ -245,13 +360,16 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         }
         if (settingsOpen) renderSettings(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
+        if (!hoveredItem.isEmpty()) {
+            graphics.renderTooltip(font, hoveredItem, mouseX, mouseY);
+        }
     }
 
     private void renderSettings(GuiGraphics graphics) {
         int x = panelLeft + panelWidth - 187;
         int y = panelTop + 62;
         int width = 173;
-        int height = 58;
+        int height = 84;
         MoneyDisplay.fillRounded(graphics, x, y, width, height, 0xFC171717);
         MoneyDisplay.outline(graphics, x, y, width, height, ACCENT);
         graphics.drawString(font, Component.translatable(
@@ -307,8 +425,12 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     private void renderEntry(GuiGraphics graphics, EntryView entry, int x, int y) {
         int width = panelWidth - 20;
         graphics.fill(x, y, x + width, y + ENTRY_HEIGHT - 2, PANEL_ALT);
-        ItemStack icon = item(entry.itemId);
-        if (!icon.isEmpty()) graphics.renderItem(icon, x + 6, y + 6);
+        ItemStack icon = entry.item.isEmpty()
+                ? item(entry.itemId) : entry.item.copy();
+        if (!icon.isEmpty()) {
+            graphics.renderItem(icon, x + 6, y + 6);
+            offerTooltip(icon, x + 6, y + 6);
+        }
         int textX = x + (icon.isEmpty() ? 8 : 28);
         Component label = Component.translatable(
                 "screen.numismatics_treasury.history.entry."
@@ -351,13 +473,17 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         int end = Math.min(shops.size(), scroll + SHOP_ROWS);
         for (int index = scroll; index < end; index++) {
             ShopView shop = shops.get(index);
-            int y = panelTop + 66 + (index - scroll) * SHOP_HEIGHT;
+            int y = panelTop + 90 + (index - scroll) * SHOP_HEIGHT;
             graphics.fill(x, y, x + listWidth, y + SHOP_HEIGHT - 3, PANEL_ALT);
             if (index == selectedShopIndex) {
                 outline(graphics, x, y, listWidth, SHOP_HEIGHT - 3, ACCENT);
             }
-            ItemStack icon = item(shop.itemId);
-            if (!icon.isEmpty()) graphics.renderItem(icon, x + 7, y + 8);
+            ItemStack icon = shop.item.isEmpty()
+                    ? item(shop.itemId) : shop.item.copy();
+            if (!icon.isEmpty()) {
+                graphics.renderItem(icon, x + 7, y + 8);
+                offerTooltip(icon, x + 7, y + 8);
+            }
             String title = shop.itemName.isBlank()
                     ? Component.translatable("screen.numismatics_treasury.no_item").getString()
                     : shop.itemName;
@@ -381,11 +507,15 @@ public final class HistoryStatsScreen extends TreasuryScreen {
 
     private void renderShopDetails(GuiGraphics graphics, ShopView shop) {
         int x = panelLeft + 210;
-        int y = panelTop + 66;
+        int y = panelTop + 90;
         int width = panelWidth - 220;
         graphics.fill(x, y, x + width, panelTop + panelHeight - 10, PANEL_ALT);
-        ItemStack icon = item(shop.itemId);
-        if (!icon.isEmpty()) graphics.renderItem(icon, x + 9, y + 8);
+        ItemStack icon = shop.item.isEmpty()
+                ? item(shop.itemId) : shop.item.copy();
+        if (!icon.isEmpty()) {
+            graphics.renderItem(icon, x + 9, y + 8);
+            offerTooltip(icon, x + 9, y + 8);
+        }
         graphics.drawString(font,
                 font.plainSubstrByWidth(shop.itemName, width - 44),
                 x + 32, y + 7, TEXT, false);
@@ -416,21 +546,24 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     x + 9, y + 160, MUTED, false);
             return;
         }
-        int count = Math.min(4, shop.beneficiaries.size());
-        for (int index = 0; index < count; index++) {
+        int maximum = maximumBeneficiaryScroll();
+        beneficiaryScroll = Math.max(0, Math.min(beneficiaryScroll, maximum));
+        int end = Math.min(
+                shop.beneficiaries.size(),
+                beneficiaryScroll + BENEFICIARY_ROWS
+        );
+        for (int index = beneficiaryScroll; index < end; index++) {
             BeneficiaryView beneficiary = shop.beneficiaries.get(index);
+            int row = index - beneficiaryScroll;
             String amount = number(beneficiary.revenue) + " spurs";
             graphics.drawString(font,
                     font.plainSubstrByWidth(beneficiary.name, width - 100),
-                    x + 9, y + 160 + index * 14, TEXT, false);
+                    x + 9, y + 160 + row * 14, TEXT, false);
             graphics.drawString(font, amount,
                     x + width - 9 - font.width(amount),
-                    y + 160 + index * 14, SUCCESS, false);
+                    y + 160 + row * 14, SUCCESS, false);
         }
-        if (shop.beneficiaries.size() > count) {
-            graphics.drawString(font, "+" + (shop.beneficiaries.size() - count),
-                    x + 9, y + 160 + count * 14, MUTED, false);
-        }
+        beneficiaryScrollbar(graphics);
     }
 
     private void periodLine(
@@ -532,7 +665,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             );
             case SHOPS -> shops.isEmpty() ? null : new ScrollbarLayout(
                     panelLeft + 203,
-                    panelTop + 66,
+                    panelTop + 90,
                     SHOP_ROWS * SHOP_HEIGHT,
                     shops.size(),
                     SHOP_ROWS
@@ -575,6 +708,70 @@ public final class HistoryStatsScreen extends TreasuryScreen {
         double relative = (mouseY - layout.y - thumb / 2.0D) / travel;
         scroll = Math.max(0, Math.min(maximum,
                 (int) Math.round(relative * maximum)));
+    }
+
+    private int maximumBeneficiaryScroll() {
+        if (tab != Tab.SHOPS || shops.isEmpty()) return 0;
+        ShopView shop = shops.get(Math.min(selectedShopIndex, shops.size() - 1));
+        return Math.max(0, shop.beneficiaries.size() - BENEFICIARY_ROWS);
+    }
+
+    private ScrollbarLayout beneficiaryScrollbarLayout() {
+        if (tab != Tab.SHOPS || shops.isEmpty()) return null;
+        ShopView shop = shops.get(Math.min(selectedShopIndex, shops.size() - 1));
+        if (shop.beneficiaries.isEmpty()) return null;
+        return new ScrollbarLayout(
+                panelLeft + panelWidth - 17,
+                panelTop + 250,
+                BENEFICIARY_ROWS * 14,
+                shop.beneficiaries.size(),
+                BENEFICIARY_ROWS
+        );
+    }
+
+    private void beneficiaryScrollbar(GuiGraphics graphics) {
+        ScrollbarLayout layout = beneficiaryScrollbarLayout();
+        if (layout == null || maximumBeneficiaryScroll() == 0) return;
+        graphics.fill(
+                layout.x,
+                layout.y,
+                layout.x + 3,
+                layout.y + layout.height,
+                SEPARATOR
+        );
+        int thumb = layout.thumbHeight();
+        int travel = layout.height - thumb;
+        int position = travel * beneficiaryScroll / maximumBeneficiaryScroll();
+        graphics.fill(
+                layout.x,
+                layout.y + position,
+                layout.x + 3,
+                layout.y + position + thumb,
+                ACCENT
+        );
+    }
+
+    private void updateBeneficiaryScrollFromMouse(
+            double mouseY,
+            ScrollbarLayout layout
+    ) {
+        int maximum = maximumBeneficiaryScroll();
+        if (maximum == 0) {
+            beneficiaryScroll = 0;
+            return;
+        }
+        int thumb = layout.thumbHeight();
+        int travel = Math.max(1, layout.height - thumb);
+        double relative = (mouseY - layout.y - thumb / 2.0D) / travel;
+        beneficiaryScroll = Math.max(0, Math.min(maximum,
+                (int) Math.round(relative * maximum)));
+    }
+
+    private void offerTooltip(ItemStack stack, int x, int y) {
+        if (currentMouseX >= x && currentMouseX < x + 16
+                && currentMouseY >= y && currentMouseY < y + 16) {
+            hoveredItem = stack;
+        }
     }
 
     private record ScrollbarLayout(
@@ -642,28 +839,34 @@ public final class HistoryStatsScreen extends TreasuryScreen {
     }
 
     private enum Tab {
-        OVERVIEW(
-                "screen.numismatics_treasury.history.tab.overview",
-                "history_overview"),
-        HISTORY(
-                "screen.numismatics_treasury.history.tab.history",
-                "history_transactions"),
-        SHOPS(
-                "screen.numismatics_treasury.history.tab.shops",
-                "history_player_shops"),
-        SERVER(
-                "screen.numismatics_treasury.history.tab.server",
-                "history_server");
+        OVERVIEW("screen.numismatics_treasury.history.tab.overview"),
+        HISTORY("screen.numismatics_treasury.history.tab.history"),
+        SHOPS("screen.numismatics_treasury.history.tab.shops"),
+        SERVER("screen.numismatics_treasury.history.tab.server");
 
         private final String key;
-        private final ResourceLocation icon;
 
-        Tab(String key, String iconName) {
+        Tab(String key) {
             this.key = key;
-            icon = ResourceLocation.fromNamespaceAndPath(
-                    NumismaticsTreasury.MOD_ID,
-                    "textures/gui/icons/" + iconName + ".png"
-            );
+        }
+    }
+
+    private enum ShopSort {
+        RECENT("screen.numismatics_treasury.history.sort.recent"),
+        SALES("screen.numismatics_treasury.history.sort.sales"),
+        ITEMS("screen.numismatics_treasury.history.sort.items"),
+        REVENUE("screen.numismatics_treasury.history.sort.revenue"),
+        BEST_SALE("screen.numismatics_treasury.history.sort.best_sale");
+
+        private final String key;
+
+        ShopSort(String key) {
+            this.key = key;
+        }
+
+        private ShopSort next() {
+            ShopSort[] values = values();
+            return values[(ordinal() + 1) % values.length];
         }
     }
 
@@ -692,6 +895,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             int quantity,
             String itemId,
             String itemName,
+            ItemStack item,
             String counterparty,
             String detail
     ) {
@@ -703,6 +907,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     ClientScreenData.integer(data, "quantity", 0),
                     ClientScreenData.string(data, "itemId", "minecraft:air"),
                     ClientScreenData.string(data, "itemName", ""),
+                    ClientScreenData.item(data),
                     ClientScreenData.string(data, "counterparty", ""),
                     ClientScreenData.string(data, "detail", "")
             );
@@ -726,6 +931,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
             long pos,
             String itemId,
             String itemName,
+            ItemStack item,
             long sales,
             long itemsSold,
             long grossRevenue,
@@ -751,6 +957,7 @@ public final class HistoryStatsScreen extends TreasuryScreen {
                     longValue(data, "pos"),
                     ClientScreenData.string(data, "itemId", "minecraft:air"),
                     ClientScreenData.string(data, "itemName", ""),
+                    ClientScreenData.item(data),
                     longValue(data, "sales"),
                     longValue(data, "itemsSold"),
                     longValue(data, "grossRevenue"),

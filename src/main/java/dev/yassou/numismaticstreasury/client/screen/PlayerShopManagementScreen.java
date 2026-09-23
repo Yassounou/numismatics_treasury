@@ -86,6 +86,8 @@ public final class PlayerShopManagementScreen
                         ignored -> save())
                 .green()
                 .icon(SAVE_ICON)
+                .iconScale(0.75F)
+                .iconYOffset(-1)
                 .confirmation(Component.translatable("screen.numismatics_treasury.confirm"))
                 .bounds(leftPos + 8, topPos + 103, 37, 20)
                 .build());
@@ -94,6 +96,8 @@ public final class PlayerShopManagementScreen
                                 "screen.numismatics_treasury.player_shop.withdraw_inventory"),
                         ignored -> withdraw())
                 .icon(WITHDRAW_ICON)
+                .iconScale(0.75F)
+                .iconYOffset(-1)
                 .bounds(leftPos + 49, topPos + 103, 37, 20)
                 .build());
 
@@ -102,12 +106,16 @@ public final class PlayerShopManagementScreen
                                 "screen.numismatics_treasury.player_shop.associates"),
                         ignored -> openAssociates())
                 .icon(ASSOCIATES_ICON)
+                .iconScale(0.75F)
+                .iconYOffset(-1)
                 .bounds(leftPos + 90, topPos + 103, 37, 20)
                 .build());
         addRenderableWidget(TreasuryButton.builder(
                         Component.translatable("screen.numismatics_treasury.history.stats"),
                         ignored -> openStats())
                 .icon(STATISTICS_ICON)
+                .iconScale(0.75F)
+                .iconYOffset(-1)
                 .bounds(leftPos + 131, topPos + 103, 37, 20)
                 .build());
         updateButtons();

@@ -12,8 +12,10 @@ import net.minecraft.world.level.saveddata.SavedData;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** Global server-wide auction data, stored in the overworld SavedData. */
@@ -24,6 +26,7 @@ public final class TreasuryData extends SavedData {
     private final Map<UUID, AuctionListing> listings = new LinkedHashMap<>();
     private final Map<UUID, List<ItemStack>> itemClaims = new LinkedHashMap<>();
     private final Map<UUID, List<TreasuryNotification>> notifications = new LinkedHashMap<>();
+    private final Set<UUID> disabledNotifications = new LinkedHashSet<>();
 
     public static TreasuryData get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(
@@ -87,6 +90,7 @@ public final class TreasuryData extends SavedData {
     }
 
     public void addNotification(UUID playerUuid, String key, Object... arguments) {
+        if (!notificationsEnabled(playerUuid)) return;
         List<String> values = new ArrayList<>();
         for (Object argument : arguments) {
             values.add(argument instanceof net.minecraft.network.chat.Component component
@@ -102,6 +106,19 @@ public final class TreasuryData extends SavedData {
         if (pending == null || pending.isEmpty()) return List.of();
         setDirty();
         return List.copyOf(pending);
+    }
+
+    public boolean notificationsEnabled(UUID playerUuid) {
+        return playerUuid != null && !disabledNotifications.contains(playerUuid);
+    }
+
+    public void setNotificationsEnabled(UUID playerUuid, boolean enabled) {
+        if (playerUuid == null) return;
+        boolean changed = enabled
+                ? disabledNotifications.remove(playerUuid)
+                : disabledNotifications.add(playerUuid);
+        if (!enabled) changed |= notifications.remove(playerUuid) != null;
+        if (changed) setDirty();
     }
 
     @Override
@@ -137,6 +154,14 @@ public final class TreasuryData extends SavedData {
             notificationOwners.add(owner);
         });
         tag.put("notifications", notificationOwners);
+
+        ListTag disabled = new ListTag();
+        for (UUID playerUuid : disabledNotifications) {
+            CompoundTag player = new CompoundTag();
+            player.putUUID("uuid", playerUuid);
+            disabled.add(player);
+        }
+        tag.put("disabledNotifications", disabled);
         return tag;
     }
 
@@ -174,6 +199,12 @@ public final class TreasuryData extends SavedData {
             }
             if (!pending.isEmpty()) {
                 data.notifications.put(owner.getUUID("playerUuid"), pending);
+            }
+        }
+        for (Tag value : tag.getList("disabledNotifications", Tag.TAG_COMPOUND)) {
+            CompoundTag player = (CompoundTag) value;
+            if (player.hasUUID("uuid")) {
+                data.disabledNotifications.add(player.getUUID("uuid"));
             }
         }
         return data;
